@@ -3,308 +3,147 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Lewisham OSINT — Crime Database</title>
+  <title>Lewisham OSINT — Intelligence Database</title>
   <meta name="robots" content="noindex, nofollow" />
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0f1117; color: #e2e8f0; min-height: 100vh; }
 
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      background: #0f1117;
-      color: #e2e8f0;
-      min-height: 100vh;
-    }
-
-    /* ─── Login overlay ──────────────────────────────────── */
-    .login-overlay {
-      position: fixed; inset: 0; z-index: 9999;
-      background: #0f1117;
-      display: flex; align-items: center; justify-content: center;
-    }
+    .login-overlay { position: fixed; inset: 0; z-index: 9999; background: #0f1117; display: flex; align-items: center; justify-content: center; }
     .login-overlay.hidden { display: none; }
-    .login-box {
-      background: #1a1d2e; border: 1px solid #2d3148;
-      border-radius: 12px; padding: 32px; width: 360px; max-width: 90vw;
-    }
+    .login-box { background: #1a1d2e; border: 1px solid #2d3148; border-radius: 12px; padding: 32px; width: 360px; max-width: 90vw; }
     .login-box h2 { font-size: 18px; font-weight: 600; color: #fff; margin-bottom: 4px; }
     .login-box p { font-size: 12px; color: #64748b; margin-bottom: 20px; }
     .login-box label { display: block; font-size: 11px; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 5px; }
-    .login-box input {
-      width: 100%; padding: 10px 12px; border: 1px solid #2d3148; border-radius: 6px;
-      background: #0f1117; color: #e2e8f0; font-size: 14px; margin-bottom: 14px; outline: none;
-    }
+    .login-box input { width: 100%; padding: 10px 12px; border: 1px solid #2d3148; border-radius: 6px; background: #0f1117; color: #e2e8f0; font-size: 14px; margin-bottom: 14px; outline: none; }
     .login-box input:focus { border-color: #3b82f6; }
-    .login-btn {
-      width: 100%; padding: 10px; border: none; border-radius: 6px;
-      background: #3b82f6; color: #fff; font-size: 14px; font-weight: 600; cursor: pointer;
-    }
+    .login-btn { width: 100%; padding: 10px; border: none; border-radius: 6px; background: #3b82f6; color: #fff; font-size: 14px; font-weight: 600; cursor: pointer; }
     .login-btn:hover { background: #2563eb; }
     .login-btn:disabled { opacity: 0.5; cursor: not-allowed; }
     .login-error { font-size: 12px; color: #f87171; margin-top: 10px; text-align: center; display: none; }
     .login-error.show { display: block; }
 
-    /* ─── Header ─────────────────────────────────────────── */
-    header {
-      background: #1a1d2e; border-bottom: 1px solid #2d3148;
-      padding: 14px 24px; display: flex; align-items: center; justify-content: space-between;
-      position: sticky; top: 0; z-index: 1000;
-    }
+    header { background: #1a1d2e; border-bottom: 1px solid #2d3148; padding: 14px 24px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 1000; }
     header h1 { font-size: 18px; font-weight: 600; color: #fff; letter-spacing: -0.3px; }
     header p { font-size: 12px; color: #64748b; margin-top: 2px; }
-
     .header-actions { display: flex; gap: 8px; align-items: center; }
-
-    .nav-btn, .logout-btn {
-      font-size: 11px; padding: 5px 12px; border: 1px solid #2d3148;
-      border-radius: 6px; background: transparent; color: #64748b; cursor: pointer; text-decoration: none;
-    }
+    .nav-btn, .logout-btn { font-size: 11px; padding: 5px 12px; border: 1px solid #2d3148; border-radius: 6px; background: transparent; color: #64748b; cursor: pointer; text-decoration: none; }
     .nav-btn:hover { color: #94a3b8; border-color: #3d4268; }
     .logout-btn { border-color: #ef4444; color: #f87171; }
     .logout-btn:hover { background: rgba(239,68,68,0.1); }
 
-    /* ─── Container ──────────────────────────────────────── */
     .container { max-width: 1400px; margin: 0 auto; padding: 20px 24px; }
 
-    /* ─── Stats bar ──────────────────────────────────────── */
-    .stats-bar {
-      display: flex; gap: 12px; margin-bottom: 16px; flex-wrap: wrap;
-    }
-    .stat-chip {
-      background: #1a1d2e; border: 1px solid #2d3148; border-radius: 8px;
-      padding: 10px 16px; display: flex; flex-direction: column;
-    }
+    .stats-bar { display: flex; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
+    .stat-chip { background: #1a1d2e; border: 1px solid #2d3148; border-radius: 8px; padding: 10px 16px; display: flex; flex-direction: column; }
     .stat-chip .stat-value { font-size: 22px; font-weight: 700; color: #fff; }
     .stat-chip .stat-label { font-size: 10px; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; }
 
-    /* ─── Controls bar ───────────────────────────────────── */
-    .controls {
-      display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; align-items: center;
-    }
-    .search-input {
-      flex: 1; min-width: 200px; padding: 8px 12px; border: 1px solid #2d3148;
-      border-radius: 6px; background: #1a1d2e; color: #e2e8f0; font-size: 13px; outline: none;
-    }
+    .controls { display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; align-items: center; }
+    .search-input { flex: 1; min-width: 200px; padding: 8px 12px; border: 1px solid #2d3148; border-radius: 6px; background: #1a1d2e; color: #e2e8f0; font-size: 13px; outline: none; }
     .search-input:focus { border-color: #3b82f6; }
     .search-input::placeholder { color: #475569; }
+    .filter-select { padding: 8px 10px; border: 1px solid #2d3148; border-radius: 6px; background: #1a1d2e; color: #e2e8f0; font-size: 12px; outline: none; cursor: pointer; }
+    .action-btn { padding: 7px 12px; border: 1px solid #2d3148; border-radius: 6px; background: transparent; color: #64748b; font-size: 12px; cursor: pointer; }
+    .action-btn:hover { color: #94a3b8; border-color: #3d4268; }
+    .action-btn.primary { border-color: #3b82f6; color: #60a5fa; }
+    .action-btn.primary:hover { background: rgba(59,130,246,0.1); }
 
-    .filter-select {
-      padding: 8px 10px; border: 1px solid #2d3148; border-radius: 6px;
-      background: #1a1d2e; color: #e2e8f0; font-size: 12px; outline: none; cursor: pointer;
-    }
-
-    .view-toggle {
-      display: flex; border: 1px solid #2d3148; border-radius: 6px; overflow: hidden;
-    }
-    .view-toggle button {
-      padding: 7px 12px; border: none; background: transparent;
-      color: #64748b; font-size: 12px; cursor: pointer;
-    }
-    .view-toggle button.active { background: #2d3148; color: #e2e8f0; }
-    .view-toggle button:hover:not(.active) { color: #94a3b8; }
-
-    .export-btn, .correlate-btn {
-      padding: 7px 12px; border: 1px solid #2d3148; border-radius: 6px;
-      background: transparent; color: #64748b; font-size: 12px; cursor: pointer;
-    }
-    .export-btn:hover, .correlate-btn:hover { color: #94a3b8; border-color: #3d4268; }
-    .correlate-btn { border-color: #3b82f6; color: #60a5fa; }
-    .correlate-btn:hover { background: rgba(59,130,246,0.1); }
-
-    /* ─── Table view ─────────────────────────────────────── */
-    .table-wrap {
-      background: #1a1d2e; border: 1px solid #2d3148; border-radius: 10px; overflow: hidden;
-    }
+    .table-wrap { background: #1a1d2e; border: 1px solid #2d3148; border-radius: 10px; overflow-x: auto; }
     table { width: 100%; border-collapse: collapse; }
-    thead th {
-      padding: 10px 14px; font-size: 11px; font-weight: 500; color: #64748b;
-      text-transform: uppercase; letter-spacing: 0.05em; text-align: left;
-      border-bottom: 1px solid #2d3148; cursor: pointer; user-select: none;
-      white-space: nowrap;
-    }
+    thead th { padding: 10px 12px; font-size: 11px; font-weight: 500; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; text-align: left; border-bottom: 1px solid #2d3148; cursor: pointer; user-select: none; white-space: nowrap; }
     thead th:hover { color: #94a3b8; }
     thead th.sorted { color: #3b82f6; }
-    tbody td {
-      padding: 10px 14px; font-size: 12px; color: #cbd5e1;
-      border-bottom: 1px solid #1e2235; text-transform: capitalize;
-    }
+    tbody td { padding: 10px 12px; font-size: 12px; color: #cbd5e1; border-bottom: 1px solid #1e2235; }
     tbody tr:hover { background: #1e2235; }
-    tbody tr:last-child td { border-bottom: none; }
     tbody tr.expandable { cursor: pointer; }
 
-    .category-badge {
-      display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 10px;
-      font-weight: 600; text-transform: capitalize;
-      background: rgba(239,68,68,0.15); color: #f87171;
-    }
+    .source-badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: 600; text-transform: uppercase; }
+    .source-badge.police { background: rgba(239,68,68,0.15); color: #f87171; }
+    .source-badge.twitter { background: rgba(59,130,246,0.15); color: #60a5fa; }
+    .source-badge.news { background: rgba(74,222,128,0.15); color: #4ade80; }
 
-    .link-count {
-      display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 600;
-      background: rgba(59,130,246,0.15); color: #60a5fa;
-    }
+    .link-count { display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 600; background: rgba(59,130,246,0.15); color: #60a5fa; }
     .link-count.zero { background: transparent; color: #475569; }
 
-    /* ─── Expanded detail row ─────────────────────────────── */
+    .conf-badge { display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 600; }
+    .conf-high { background: rgba(74,222,128,0.15); color: #4ade80; }
+    .conf-med { background: rgba(250,204,21,0.15); color: #facc15; }
+    .conf-low { background: rgba(239,68,68,0.15); color: #f87171; }
+    .conf-none { color: #475569; }
+
+    .commit-cb { width: 16px; height: 16px; accent-color: #3b82f6; cursor: pointer; }
+    .commit-cb:disabled { opacity: 0.4; cursor: not-allowed; }
+
     .detail-row td { padding: 0 !important; border-bottom: 1px solid #2d3148 !important; }
-    .detail-panel {
-      padding: 16px 20px; background: #141726;
-    }
+    .detail-panel { padding: 16px 20px; background: #141726; }
     .detail-section { margin-bottom: 12px; }
     .detail-section:last-child { margin-bottom: 0; }
-    .detail-section-title {
-      font-size: 10px; font-weight: 700; text-transform: uppercase;
-      letter-spacing: 0.05em; margin-bottom: 8px;
-    }
+    .detail-section-title { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px; }
     .detail-section-title.tweets { color: #3b82f6; }
     .detail-section-title.articles { color: #4ade80; }
+    .detail-section-title.summary { color: #c084fc; }
 
-    .linked-item {
-      display: flex; justify-content: space-between; align-items: flex-start;
-      padding: 8px 10px; background: #1a1d2e; border: 1px solid #2d3148;
-      border-radius: 6px; margin-bottom: 6px;
-    }
+    .linked-item { display: flex; justify-content: space-between; align-items: flex-start; padding: 8px 10px; background: #1a1d2e; border: 1px solid #2d3148; border-radius: 6px; margin-bottom: 6px; }
     .linked-item-content { flex: 1; min-width: 0; }
     .linked-item-meta { font-size: 10px; color: #64748b; margin-top: 2px; }
     .linked-item-text { font-size: 11px; color: #cbd5e1; margin-top: 3px; line-height: 1.4; }
     .linked-item a { color: #60a5fa; text-decoration: none; font-size: 11px; }
     .linked-item a:hover { text-decoration: underline; }
-
-    .remove-link-btn {
-      padding: 3px 8px; border: 1px solid #ef4444; border-radius: 4px;
-      background: transparent; color: #f87171; font-size: 9px; cursor: pointer;
-      white-space: nowrap; margin-left: 8px; flex-shrink: 0;
-    }
+    .remove-link-btn { padding: 3px 8px; border: 1px solid #ef4444; border-radius: 4px; background: transparent; color: #f87171; font-size: 9px; cursor: pointer; white-space: nowrap; margin-left: 8px; flex-shrink: 0; }
     .remove-link-btn:hover { background: rgba(239,68,68,0.15); }
-
-    .add-link-btn {
-      padding: 4px 10px; border: 1px solid #2d3148; border-radius: 4px;
-      background: transparent; color: #64748b; font-size: 10px; cursor: pointer;
-      margin-top: 4px;
-    }
+    .add-link-btn { padding: 4px 10px; border: 1px solid #2d3148; border-radius: 4px; background: transparent; color: #64748b; font-size: 10px; cursor: pointer; margin-top: 4px; }
     .add-link-btn:hover { color: #94a3b8; border-color: #3d4268; }
-
-    .confidence-badge {
-      display: inline-block; padding: 1px 5px; border-radius: 3px;
-      font-size: 9px; font-weight: 600; margin-left: 4px;
-    }
+    .confidence-badge { display: inline-block; padding: 1px 5px; border-radius: 3px; font-size: 9px; font-weight: 600; margin-left: 4px; }
     .confidence-badge.auto { background: rgba(250,204,21,0.15); color: #facc15; }
     .confidence-badge.manual { background: rgba(74,222,128,0.15); color: #4ade80; }
-
     .no-links { font-size: 11px; color: #475569; padding: 4px 0; }
 
-    /* ─── Card view ──────────────────────────────────────── */
-    .cards-grid {
-      display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-      gap: 12px;
-    }
-    .crime-card {
-      background: #1a1d2e; border: 1px solid #2d3148; border-radius: 10px;
-      padding: 14px 16px; transition: border-color 0.15s; cursor: pointer;
-    }
-    .crime-card:hover { border-color: #3d4268; }
-    .crime-card .card-cat {
-      font-size: 10px; font-weight: 600; text-transform: uppercase; color: #f87171;
-      margin-bottom: 6px; letter-spacing: 0.04em;
-    }
-    .crime-card .card-street { font-size: 14px; color: #e2e8f0; font-weight: 500; margin-bottom: 4px; text-transform: capitalize; }
-    .crime-card .card-meta { font-size: 11px; color: #475569; }
-    .crime-card .card-outcome { font-size: 11px; color: #94a3b8; margin-top: 6px; text-transform: capitalize; }
-    .crime-card .card-links { font-size: 10px; color: #60a5fa; margin-top: 6px; }
+    .summary-box { padding: 10px 12px; background: #1a1d2e; border-left: 3px solid #c084fc; border-radius: 0 6px 6px 0; margin-bottom: 8px; font-size: 11px; color: #cbd5e1; line-height: 1.5; }
+    .summary-media { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
+    .summary-media img { width: 80px; height: 60px; object-fit: cover; border-radius: 4px; border: 1px solid #2d3148; }
 
-    /* ─── Link search modal ──────────────────────────────── */
-    .modal-overlay {
-      position: fixed; inset: 0; z-index: 9998;
-      background: rgba(0,0,0,0.7); display: none;
-      align-items: center; justify-content: center;
-    }
+    .desc-cell { max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-transform: capitalize; }
+
+    /* Modal */
+    .modal-overlay { position: fixed; inset: 0; z-index: 9998; background: rgba(0,0,0,0.7); display: none; align-items: center; justify-content: center; }
     .modal-overlay.show { display: flex; }
-    .modal {
-      background: #1a1d2e; border: 1px solid #2d3148; border-radius: 12px;
-      width: 560px; max-width: 95vw; max-height: 80vh; display: flex; flex-direction: column;
-    }
-    .modal-header {
-      padding: 16px 20px; border-bottom: 1px solid #2d3148;
-      display: flex; justify-content: space-between; align-items: center;
-    }
+    .modal { background: #1a1d2e; border: 1px solid #2d3148; border-radius: 12px; width: 560px; max-width: 95vw; max-height: 80vh; display: flex; flex-direction: column; }
+    .modal-header { padding: 16px 20px; border-bottom: 1px solid #2d3148; display: flex; justify-content: space-between; align-items: center; }
     .modal-header h3 { font-size: 14px; font-weight: 600; color: #fff; }
-    .modal-close {
-      background: none; border: none; color: #64748b; font-size: 18px; cursor: pointer;
-    }
+    .modal-close { background: none; border: none; color: #64748b; font-size: 18px; cursor: pointer; }
     .modal-close:hover { color: #e2e8f0; }
-    .modal-tabs {
-      display: flex; border-bottom: 1px solid #2d3148;
-    }
-    .modal-tab {
-      flex: 1; padding: 10px; text-align: center; border: none; background: none;
-      color: #64748b; font-size: 12px; font-weight: 600; cursor: pointer;
-    }
+    .modal-tabs { display: flex; border-bottom: 1px solid #2d3148; }
+    .modal-tab { flex: 1; padding: 10px; text-align: center; border: none; background: none; color: #64748b; font-size: 12px; font-weight: 600; cursor: pointer; }
     .modal-tab.active { color: #3b82f6; border-bottom: 2px solid #3b82f6; }
-    .modal-tab:hover:not(.active) { color: #94a3b8; }
-    .modal-search {
-      margin: 12px 16px; padding: 8px 12px; border: 1px solid #2d3148; border-radius: 6px;
-      background: #0f1117; color: #e2e8f0; font-size: 13px; outline: none; width: calc(100% - 32px);
-    }
+    .modal-search { margin: 12px 16px; padding: 8px 12px; border: 1px solid #2d3148; border-radius: 6px; background: #0f1117; color: #e2e8f0; font-size: 13px; outline: none; width: calc(100% - 32px); }
     .modal-search:focus { border-color: #3b82f6; }
-    .modal-results {
-      flex: 1; overflow-y: auto; padding: 0 16px 16px;
-    }
-    .modal-result-item {
-      display: flex; justify-content: space-between; align-items: center;
-      padding: 10px 12px; background: #0f1117; border: 1px solid #2d3148;
-      border-radius: 6px; margin-bottom: 6px;
-    }
-    .modal-result-item:hover { border-color: #3d4268; }
+    .modal-results { flex: 1; overflow-y: auto; padding: 0 16px 16px; }
+    .modal-result-item { display: flex; justify-content: space-between; align-items: center; padding: 10px 12px; background: #0f1117; border: 1px solid #2d3148; border-radius: 6px; margin-bottom: 6px; }
     .modal-result-text { flex: 1; min-width: 0; }
     .modal-result-text .title { font-size: 12px; color: #e2e8f0; }
     .modal-result-text .meta { font-size: 10px; color: #64748b; margin-top: 2px; }
-    .link-btn {
-      padding: 4px 10px; border: 1px solid #3b82f6; border-radius: 4px;
-      background: transparent; color: #60a5fa; font-size: 10px; font-weight: 600;
-      cursor: pointer; white-space: nowrap; margin-left: 8px;
-    }
+    .link-btn { padding: 4px 10px; border: 1px solid #3b82f6; border-radius: 4px; background: transparent; color: #60a5fa; font-size: 10px; font-weight: 600; cursor: pointer; white-space: nowrap; margin-left: 8px; }
     .link-btn:hover { background: rgba(59,130,246,0.15); }
     .link-btn:disabled { opacity: 0.4; cursor: not-allowed; }
-
-    .modal-pagination {
-      display: flex; justify-content: center; gap: 8px; padding: 8px 16px;
-      border-top: 1px solid #2d3148;
-    }
-    .modal-page-btn {
-      padding: 4px 10px; border: 1px solid #2d3148; border-radius: 4px;
-      background: transparent; color: #64748b; font-size: 11px; cursor: pointer;
-    }
-    .modal-page-btn:hover:not(:disabled) { color: #94a3b8; }
+    .modal-pagination { display: flex; justify-content: center; gap: 8px; padding: 8px 16px; border-top: 1px solid #2d3148; }
+    .modal-page-btn { padding: 4px 10px; border: 1px solid #2d3148; border-radius: 4px; background: transparent; color: #64748b; font-size: 11px; cursor: pointer; }
     .modal-page-btn:disabled { opacity: 0.3; cursor: not-allowed; }
     .modal-loading { text-align: center; padding: 20px; color: #475569; font-size: 12px; }
 
-    /* ─── Pagination ─────────────────────────────────────── */
-    .pagination {
-      display: flex; justify-content: space-between; align-items: center;
-      margin-top: 16px; padding: 0 4px;
-    }
+    .pagination { display: flex; justify-content: space-between; align-items: center; margin-top: 16px; padding: 0 4px; }
     .pagination .page-info { font-size: 12px; color: #64748b; }
     .pagination .page-btns { display: flex; gap: 6px; }
-    .page-btn {
-      padding: 6px 12px; border: 1px solid #2d3148; border-radius: 6px;
-      background: transparent; color: #64748b; font-size: 12px; cursor: pointer;
-    }
+    .page-btn { padding: 6px 12px; border: 1px solid #2d3148; border-radius: 6px; background: transparent; color: #64748b; font-size: 12px; cursor: pointer; }
     .page-btn:hover:not(:disabled) { color: #94a3b8; border-color: #3d4268; }
     .page-btn:disabled { opacity: 0.3; cursor: not-allowed; }
-
     .hidden { display: none !important; }
-
-    .empty-state {
-      text-align: center; padding: 60px 20px; color: #475569; font-size: 14px;
-    }
-
-    @media (max-width: 768px) {
-      .controls { flex-direction: column; }
-      .search-input { min-width: unset; }
-    }
+    .empty-state { text-align: center; padding: 60px 20px; color: #475569; font-size: 14px; }
+    @media (max-width: 768px) { .controls { flex-direction: column; } .search-input { min-width: unset; } }
   </style>
 </head>
 <body>
 
-<!-- Login overlay -->
 <div class="login-overlay" id="login-overlay">
   <div class="login-box">
     <h2>Admin Login</h2>
@@ -320,7 +159,6 @@
   </div>
 </div>
 
-<!-- Link search modal -->
 <div class="modal-overlay" id="link-modal">
   <div class="modal">
     <div class="modal-header">
@@ -332,9 +170,7 @@
       <button class="modal-tab" id="tab-articles" onclick="switchModalTab('article')">Articles</button>
     </div>
     <input type="text" class="modal-search" id="modal-search" placeholder="Search tweets..." />
-    <div class="modal-results" id="modal-results">
-      <div class="modal-loading">Search for tweets or articles to link</div>
-    </div>
+    <div class="modal-results" id="modal-results"><div class="modal-loading">Search for tweets or articles to link</div></div>
     <div class="modal-pagination">
       <button class="modal-page-btn" id="modal-prev" onclick="modalChangePage(-1)" disabled>Prev</button>
       <span style="font-size:11px;color:#64748b;padding:4px 0;" id="modal-page-info"></span>
@@ -345,8 +181,8 @@
 
 <header>
   <div>
-    <h1>Crime Database</h1>
-    <p>Persistent police crime records — search, filter & export</p>
+    <h1>Intelligence Database</h1>
+    <p>Unified feed — Police · Twitter · News · all sources</p>
   </div>
   <div class="header-actions">
     <a href="/admin" class="nav-btn">Dashboard</a>
@@ -357,74 +193,50 @@
 
 <div class="container">
 
-  <!-- Stats -->
-  <div class="stats-bar" id="stats-bar">
-    <div class="stat-chip">
-      <span class="stat-value" id="stat-total">—</span>
-      <span class="stat-label">Total records</span>
-    </div>
-    <div class="stat-chip">
-      <span class="stat-value" id="stat-months">—</span>
-      <span class="stat-label">Months stored</span>
-    </div>
-    <div class="stat-chip">
-      <span class="stat-value" id="stat-top">—</span>
-      <span class="stat-label">Top crime type</span>
-    </div>
-    <div class="stat-chip">
-      <span class="stat-value" id="stat-tweets">—</span>
-      <span class="stat-label">Tweets stored</span>
-    </div>
-    <div class="stat-chip">
-      <span class="stat-value" id="stat-articles">—</span>
-      <span class="stat-label">Articles stored</span>
-    </div>
-    <div class="stat-chip">
-      <span class="stat-value" id="stat-links">—</span>
-      <span class="stat-label">Intel links</span>
-    </div>
+  <div class="stats-bar">
+    <div class="stat-chip"><span class="stat-value" id="stat-total">—</span><span class="stat-label">Police records</span></div>
+    <div class="stat-chip"><span class="stat-value" id="stat-tweets">—</span><span class="stat-label">Tweets</span></div>
+    <div class="stat-chip"><span class="stat-value" id="stat-articles">—</span><span class="stat-label">Articles</span></div>
+    <div class="stat-chip"><span class="stat-value" id="stat-links">—</span><span class="stat-label">Intel links</span></div>
+    <div class="stat-chip"><span class="stat-value" id="stat-committed">—</span><span class="stat-label">Committed</span></div>
   </div>
 
-  <!-- Controls -->
   <div class="controls">
-    <input type="text" class="search-input" id="search" placeholder="Search by crime type, street or outcome..." />
-    <select class="filter-select" id="filter-category">
-      <option value="">All categories</option>
+    <input type="text" class="search-input" id="search" placeholder="Search across all sources..." />
+    <select class="filter-select" id="filter-source">
+      <option value="">All sources</option>
+      <option value="police">Police</option>
+      <option value="twitter">Twitter</option>
+      <option value="news">News</option>
     </select>
-    <select class="filter-select" id="filter-month">
-      <option value="">All months</option>
+    <select class="filter-select" id="filter-links">
+      <option value="">All items</option>
+      <option value="linked">Linked only</option>
+      <option value="unlinked">Unlinked only</option>
     </select>
-    <div class="view-toggle">
-      <button class="active" id="btn-table" onclick="setView('table')">Table</button>
-      <button id="btn-cards" onclick="setView('cards')">Cards</button>
-    </div>
-    <button class="correlate-btn" onclick="runCorrelation()">Run Correlation</button>
-    <button class="export-btn" onclick="exportCsv()">Export CSV</button>
+    <button class="action-btn primary" onclick="runCorrelation()">Run Correlation</button>
+    <button class="action-btn" onclick="exportCsv()">Export CSV</button>
   </div>
 
-  <!-- Table view -->
   <div class="table-wrap" id="view-table">
     <table>
       <thead>
         <tr>
-          <th data-sort="category" onclick="sortBy('category')">Category</th>
-          <th data-sort="street" onclick="sortBy('street')">Street</th>
-          <th data-sort="outcome" onclick="sortBy('outcome')">Outcome</th>
-          <th data-sort="month" onclick="sortBy('month')">Month</th>
+          <th data-sort="source" onclick="sortBy('source')">Source</th>
+          <th data-sort="title" onclick="sortBy('title')">Description</th>
+          <th>Location</th>
+          <th data-sort="date" onclick="sortBy('date')">Date</th>
           <th data-sort="link_count" onclick="sortBy('link_count')">Links</th>
+          <th data-sort="max_confidence" onclick="sortBy('max_confidence')">Confidence</th>
+          <th>Committed</th>
         </tr>
       </thead>
       <tbody id="table-body"></tbody>
     </table>
   </div>
 
-  <!-- Card view -->
-  <div class="cards-grid hidden" id="view-cards"></div>
+  <div class="empty-state hidden" id="empty-state">No records found. Try adjusting your search or filters.</div>
 
-  <!-- Empty state -->
-  <div class="empty-state hidden" id="empty-state">No crime records found. Try adjusting your search or filters.</div>
-
-  <!-- Pagination -->
   <div class="pagination">
     <span class="page-info" id="page-info"></span>
     <div class="page-btns">
@@ -439,69 +251,33 @@
 
 const BASE = 'https://lewisham-osint-backend.onrender.com';
 const FETCH_OPTS = { credentials: 'include' };
-
-// State
-let currentView = 'table';
-let currentPage = 1;
-let currentSort = 'month';
-let currentOrder = 'DESC';
-let totalRecords = 0;
+let currentPage = 1, currentSort = 'date', currentOrder = 'DESC', totalRecords = 0;
 const LIMIT = 50;
-let searchTimeout = null;
-let expandedCrimeId = null;
-let crimesData = [];
+let searchTimeout = null, feedData = [], expandedId = null, expandedSource = null;
+let modalCrimeId = null, modalTab = 'tweet', modalPage = 1, modalSearchTimeout = null;
 
-// Modal state
-let modalCrimeId = null;
-let modalTab = 'tweet';
-let modalPage = 1;
-let modalSearchTimeout = null;
-
-function escHtml(str) {
-  const d = document.createElement('div');
-  d.textContent = str || '';
-  return d.innerHTML;
-}
+function escHtml(s) { const d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML; }
 
 // ─── Auth ─────────────────────────────────────────────
-
 async function checkSession() {
   try {
     const r = await fetch(`${BASE}/api/auth/session`, FETCH_OPTS);
     const data = await r.json();
-    if (data.authenticated) {
-      document.getElementById('login-overlay').classList.add('hidden');
-      loadStats();
-      loadCrimes();
-    }
+    if (data.authenticated) { document.getElementById('login-overlay').classList.add('hidden'); loadStats(); loadFeed(); }
   } catch {}
 }
 
 document.getElementById('login-form').addEventListener('submit', async (e) => {
   e.preventDefault();
-  const btn = document.getElementById('login-btn');
-  const errEl = document.getElementById('login-error');
-  btn.disabled = true;
-  errEl.classList.remove('show');
+  const btn = document.getElementById('login-btn'), errEl = document.getElementById('login-error');
+  btn.disabled = true; errEl.classList.remove('show');
   try {
-    const r = await fetch(`${BASE}/api/auth/login`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify({ password: document.getElementById('password').value, totp: document.getElementById('totp').value }),
-    });
+    const r = await fetch(`${BASE}/api/auth/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
+      body: JSON.stringify({ password: document.getElementById('password').value, totp: document.getElementById('totp').value }) });
     const data = await r.json();
-    if (data.success) {
-      document.getElementById('login-overlay').classList.add('hidden');
-      loadStats();
-      loadCrimes();
-    } else {
-      errEl.textContent = data.error || 'Invalid credentials.';
-      errEl.classList.add('show');
-    }
-  } catch {
-    errEl.textContent = 'Connection error.';
-    errEl.classList.add('show');
-  }
+    if (data.success) { document.getElementById('login-overlay').classList.add('hidden'); loadStats(); loadFeed(); }
+    else { errEl.textContent = data.error || 'Invalid credentials.'; errEl.classList.add('show'); }
+  } catch { errEl.textContent = 'Connection error.'; errEl.classList.add('show'); }
   btn.disabled = false;
 });
 
@@ -511,245 +287,225 @@ async function logout() {
 }
 
 // ─── Stats ────────────────────────────────────────────
-
 async function loadStats() {
   try {
     const r = await fetch(`${BASE}/api/database/stats`, FETCH_OPTS);
     const { data } = await r.json();
-
-    document.getElementById('stat-total').textContent = data.totalRecords.toLocaleString();
-    document.getElementById('stat-months').textContent = data.months.length;
-    document.getElementById('stat-top').textContent = data.categories[0]?.name.replace(/-/g, ' ') || '—';
+    document.getElementById('stat-total').textContent = (data.totalRecords || 0).toLocaleString();
     document.getElementById('stat-tweets').textContent = (data.totalTweets || 0).toLocaleString();
     document.getElementById('stat-articles').textContent = (data.totalArticles || 0).toLocaleString();
     document.getElementById('stat-links').textContent = (data.totalLinks || 0).toLocaleString();
-
-    // Populate filter dropdowns
-    const catSelect = document.getElementById('filter-category');
-    if (catSelect.options.length <= 1) {
-      data.categories.forEach(c => {
-        const opt = document.createElement('option');
-        opt.value = c.name;
-        opt.textContent = c.name.replace(/-/g, ' ') + ` (${c.count})`;
-        catSelect.appendChild(opt);
-      });
-    }
-
-    const monthSelect = document.getElementById('filter-month');
-    if (monthSelect.options.length <= 1) {
-      data.months.forEach(m => {
-        const opt = document.createElement('option');
-        opt.value = m;
-        opt.textContent = m;
-        monthSelect.appendChild(opt);
-      });
-    }
+    document.getElementById('stat-committed').textContent = (data.totalCommitted || 0).toLocaleString();
   } catch {}
 }
 
-// ─── Load crimes ──────────────────────────────────────
-
-async function loadCrimes() {
+// ─── Unified Feed ─────────────────────────────────────
+async function loadFeed() {
   const search = document.getElementById('search').value;
-  const category = document.getElementById('filter-category').value;
-  const month = document.getElementById('filter-month').value;
-
-  const params = new URLSearchParams({
-    page: currentPage, limit: LIMIT,
-    sort: currentSort, order: currentOrder,
-  });
+  const source = document.getElementById('filter-source').value;
+  const linkStatus = document.getElementById('filter-links').value;
+  const params = new URLSearchParams({ page: currentPage, limit: LIMIT, sort: currentSort, order: currentOrder });
   if (search) params.set('search', search);
-  if (category) params.set('category', category);
-  if (month) params.set('month', month);
+  if (source) params.set('source', source);
+  if (linkStatus) params.set('linkStatus', linkStatus);
 
   try {
-    const r = await fetch(`${BASE}/api/database/crimes?${params}`, FETCH_OPTS);
+    const r = await fetch(`${BASE}/api/database/feed?${params}`, FETCH_OPTS);
     const json = await r.json();
     totalRecords = json.total || 0;
-    crimesData = json.data || [];
-
-    renderTable(crimesData);
-    renderCards(crimesData);
+    feedData = json.data || [];
+    renderTable(feedData);
     renderPagination();
-
     const empty = document.getElementById('empty-state');
-    if (crimesData.length === 0) {
-      empty.classList.remove('hidden');
-      document.getElementById('view-table').classList.add('hidden');
-      document.getElementById('view-cards').classList.add('hidden');
-    } else {
-      empty.classList.add('hidden');
-      setView(currentView);
-    }
+    if (feedData.length === 0) { empty.classList.remove('hidden'); document.getElementById('view-table').classList.add('hidden'); }
+    else { empty.classList.add('hidden'); document.getElementById('view-table').classList.remove('hidden'); }
   } catch {}
 }
 
-// ─── Render table ─────────────────────────────────────
-
-function renderTable(crimes) {
+// ─── Render Table ─────────────────────────────────────
+function renderTable(items) {
   const tbody = document.getElementById('table-body');
   let html = '';
-  crimes.forEach(c => {
-    const pid = escHtml(c.persistent_id || '');
-    const linkCount = c.link_count || 0;
-    const linkClass = linkCount > 0 ? 'link-count' : 'link-count zero';
-    const isExpanded = expandedCrimeId === c.persistent_id;
+  items.forEach(item => {
+    const id = escHtml(item.id || '');
+    const src = item.source || 'police';
+    const isExpanded = expandedId === item.id && expandedSource === src;
 
-    html += `<tr class="expandable" onclick="toggleDetail('${pid}')">
-      <td><span class="category-badge">${escHtml((c.category || '').replace(/-/g, ' '))}</span></td>
-      <td>${escHtml(c.street || '—')}</td>
-      <td>${escHtml((c.outcome || '—').replace(/-/g, ' '))}</td>
-      <td>${escHtml(c.month || '—')}</td>
+    // Source badge
+    const srcBadge = `<span class="source-badge ${src}">${src === 'twitter' ? 'Twitter' : src === 'news' ? 'News' : 'Police'}</span>`;
+
+    // Description
+    let desc = '';
+    if (src === 'police') desc = escHtml((item.title || '').replace(/-/g, ' '));
+    else if (src === 'twitter') desc = escHtml((item.title || '').slice(0, 80));
+    else desc = escHtml((item.title || '').slice(0, 80));
+
+    // Location
+    const loc = escHtml(item.location || '—');
+
+    // Date
+    let dateStr = '—';
+    if (item.date) {
+      try {
+        const d = new Date(item.date);
+        dateStr = isNaN(d.getTime()) ? escHtml(item.date) : d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: '2-digit' });
+      } catch { dateStr = escHtml(item.date); }
+    }
+
+    // Links
+    const linkCount = item.link_count || 0;
+    const linkClass = linkCount > 0 ? 'link-count' : 'link-count zero';
+
+    // Confidence
+    let confHtml = '<span class="conf-none">—</span>';
+    if (item.max_confidence > 0) {
+      const pct = Math.round(item.max_confidence * 100);
+      const cls = pct >= 70 ? 'conf-high' : pct >= 40 ? 'conf-med' : 'conf-low';
+      confHtml = `<span class="conf-badge ${cls}">${pct}%</span>`;
+    }
+
+    // Committed checkbox (only for police)
+    let commitHtml = '';
+    if (src === 'police') {
+      const checked = item.is_committed ? 'checked' : '';
+      commitHtml = `<input type="checkbox" class="commit-cb" ${checked} onclick="event.stopPropagation(); toggleCommit('${id}', this)" />`;
+    } else {
+      commitHtml = '<span style="color:#475569;font-size:10px;">—</span>';
+    }
+
+    html += `<tr class="expandable" onclick="toggleDetail('${id}', '${src}')">
+      <td>${srcBadge}</td>
+      <td class="desc-cell">${desc}</td>
+      <td style="text-transform:capitalize;">${loc}</td>
+      <td style="white-space:nowrap;">${dateStr}</td>
       <td><span class="${linkClass}">${linkCount}</span></td>
+      <td>${confHtml}</td>
+      <td>${commitHtml}</td>
     </tr>`;
 
     if (isExpanded) {
-      html += `<tr class="detail-row"><td colspan="5"><div class="detail-panel" id="detail-${pid}"><div class="modal-loading">Loading links...</div></div></td></tr>`;
+      html += `<tr class="detail-row"><td colspan="7"><div class="detail-panel" id="detail-${id}"><div class="modal-loading">Loading...</div></div></td></tr>`;
     }
   });
 
   tbody.innerHTML = html;
 
-  // Update sort indicators
   document.querySelectorAll('thead th').forEach(th => {
-    th.classList.toggle('sorted', th.dataset.sort === currentSort);
-    const baseText = th.textContent.replace(/ [▲▼]/, '');
-    th.textContent = baseText;
-    if (th.dataset.sort === currentSort) {
-      th.textContent += currentOrder === 'ASC' ? ' ▲' : ' ▼';
-    }
+    const s = th.dataset.sort;
+    if (!s) return;
+    th.classList.toggle('sorted', s === currentSort);
+    const base = th.textContent.replace(/ [▲▼]/, '');
+    th.textContent = base + (s === currentSort ? (currentOrder === 'ASC' ? ' ▲' : ' ▼') : '');
   });
 
-  // Load detail if expanded
-  if (expandedCrimeId) {
-    loadCrimeDetail(expandedCrimeId);
-  }
+  if (expandedId) loadDetail(expandedId, expandedSource);
 }
 
-// ─── Render cards ─────────────────────────────────────
-
-function renderCards(crimes) {
-  document.getElementById('view-cards').innerHTML = crimes.map(c => {
-    const linkCount = c.link_count || 0;
-    const pid = escHtml(c.persistent_id || '');
-    return `<div class="crime-card" onclick="toggleDetail('${pid}')">
-      <div class="card-cat">${escHtml((c.category || '').replace(/-/g, ' '))}</div>
-      <div class="card-street">${escHtml(c.street || 'Unknown street')}</div>
-      <div class="card-meta">${escHtml(c.month || '—')} · ${c.lat?.toFixed(4)}, ${c.lng?.toFixed(4)}</div>
-      <div class="card-outcome">${escHtml((c.outcome || 'Under investigation').replace(/-/g, ' '))}</div>
-      ${linkCount > 0 ? `<div class="card-links">${linkCount} intel link${linkCount !== 1 ? 's' : ''}</div>` : ''}
-    </div>`;
-  }).join('');
+// ─── Detail Panel ─────────────────────────────────────
+function toggleDetail(id, source) {
+  if (expandedId === id && expandedSource === source) { expandedId = null; expandedSource = null; }
+  else { expandedId = id; expandedSource = source; }
+  renderTable(feedData);
 }
 
-// ─── Detail panel (expandable row) ────────────────────
-
-async function toggleDetail(persistentId) {
-  if (expandedCrimeId === persistentId) {
-    expandedCrimeId = null;
-  } else {
-    expandedCrimeId = persistentId;
-  }
-  renderTable(crimesData);
-}
-
-async function loadCrimeDetail(persistentId) {
-  const panel = document.getElementById('detail-' + CSS.escape(persistentId));
+async function loadDetail(id, source) {
+  const panel = document.getElementById('detail-' + CSS.escape(id));
   if (!panel) return;
 
-  try {
-    const r = await fetch(`${BASE}/api/database/crimes/${encodeURIComponent(persistentId)}/links`, FETCH_OPTS);
-    const json = await r.json();
-    const data = json.data || { tweets: [], articles: [] };
-    renderDetail(panel, persistentId, data);
-  } catch {
-    panel.innerHTML = '<div class="no-links">Failed to load links</div>';
+  if (source === 'police') {
+    try {
+      const r = await fetch(`${BASE}/api/database/crimes/${encodeURIComponent(id)}/links`, FETCH_OPTS);
+      const json = await r.json();
+      renderPoliceDetail(panel, id, json.data || { tweets: [], articles: [] });
+    } catch { panel.innerHTML = '<div class="no-links">Failed to load</div>'; }
+  } else if (source === 'twitter') {
+    panel.innerHTML = '<div class="no-links">Tweet detail — linked to crimes via the correlation engine. Use "Run Correlation" to update links.</div>';
+  } else {
+    panel.innerHTML = '<div class="no-links">Article detail — linked to crimes via the correlation engine. Use "Run Correlation" to update links.</div>';
   }
 }
 
-function renderDetail(panel, persistentId, data) {
+function renderPoliceDetail(panel, persistentId, data) {
   let html = '';
 
-  // Tweets section
+  // Committed summary if exists
+  const item = feedData.find(i => i.id === persistentId && i.source === 'police');
+  if (item && item.committed_summary) {
+    html += '<div class="detail-section">';
+    html += '<div class="detail-section-title summary">INTELLIGENCE SUMMARY</div>';
+    html += `<div class="summary-box">${escHtml(item.committed_summary)}</div>`;
+    html += '</div>';
+  }
+
+  // Tweets
   html += '<div class="detail-section">';
   html += `<div class="detail-section-title tweets">LINKED TWEETS (${data.tweets.length})</div>`;
-  if (data.tweets.length === 0) {
-    html += '<div class="no-links">No linked tweets</div>';
-  } else {
-    data.tweets.forEach(t => {
-      const matchBadge = t.match_type === 'manual'
-        ? '<span class="confidence-badge manual">Manual</span>'
-        : `<span class="confidence-badge auto">${Math.round((t.confidence || 0) * 100)}% auto</span>`;
-      html += `<div class="linked-item">
-        <div class="linked-item-content">
-          <a href="${escHtml(t.tweet_url)}" target="_blank" rel="noopener">@${escHtml(t.author_username)}</a>
-          ${matchBadge}
-          <div class="linked-item-meta">${t.created_at ? new Date(t.created_at).toLocaleString('en-GB') : ''} · ${t.metrics_likes || 0} likes · ${t.metrics_retweets || 0} RTs</div>
-          <div class="linked-item-text">${escHtml((t.text || '').slice(0, 200))}</div>
-        </div>
-        <button class="remove-link-btn" onclick="event.stopPropagation(); removeLink('${escHtml(persistentId)}', ${t.link_id})">Remove</button>
-      </div>`;
-    });
-  }
-  html += `<button class="add-link-btn" onclick="event.stopPropagation(); openModal('${escHtml(persistentId)}', 'tweet')">+ Link tweet</button>`;
-  html += '</div>';
+  if (data.tweets.length === 0) html += '<div class="no-links">No linked tweets</div>';
+  else data.tweets.forEach(t => {
+    const badge = t.match_type === 'manual' ? '<span class="confidence-badge manual">Manual</span>' : `<span class="confidence-badge auto">${Math.round((t.confidence||0)*100)}% auto</span>`;
+    html += `<div class="linked-item"><div class="linked-item-content">
+      <a href="${escHtml(t.tweet_url)}" target="_blank" rel="noopener">@${escHtml(t.author_username)}</a> ${badge}
+      <div class="linked-item-meta">${t.created_at ? new Date(t.created_at).toLocaleString('en-GB') : ''}</div>
+      <div class="linked-item-text">${escHtml((t.text||'').slice(0,200))}</div>
+    </div><button class="remove-link-btn" onclick="event.stopPropagation();removeLink('${escHtml(persistentId)}',${t.link_id})">Remove</button></div>`;
+  });
+  html += `<button class="add-link-btn" onclick="event.stopPropagation();openModal('${escHtml(persistentId)}','tweet')">+ Link tweet</button></div>`;
 
-  // Articles section
+  // Articles
   html += '<div class="detail-section">';
   html += `<div class="detail-section-title articles">LINKED ARTICLES (${data.articles.length})</div>`;
-  if (data.articles.length === 0) {
-    html += '<div class="no-links">No linked articles</div>';
-  } else {
-    data.articles.forEach(a => {
-      const matchBadge = a.match_type === 'manual'
-        ? '<span class="confidence-badge manual">Manual</span>'
-        : `<span class="confidence-badge auto">${Math.round((a.confidence || 0) * 100)}% auto</span>`;
-      html += `<div class="linked-item">
-        <div class="linked-item-content">
-          <a href="${escHtml(a.url)}" target="_blank" rel="noopener">${escHtml((a.title || '').slice(0, 120))}</a>
-          ${matchBadge}
-          <div class="linked-item-meta">${escHtml(a.source || '')} · ${a.published_at ? new Date(a.published_at).toLocaleDateString('en-GB') : ''}</div>
-          ${a.summary ? `<div class="linked-item-text">${escHtml(a.summary.slice(0, 150))}</div>` : ''}
-        </div>
-        <button class="remove-link-btn" onclick="event.stopPropagation(); removeLink('${escHtml(persistentId)}', ${a.link_id})">Remove</button>
-      </div>`;
-    });
-  }
-  html += `<button class="add-link-btn" onclick="event.stopPropagation(); openModal('${escHtml(persistentId)}', 'article')">+ Link article</button>`;
-  html += '</div>';
+  if (data.articles.length === 0) html += '<div class="no-links">No linked articles</div>';
+  else data.articles.forEach(a => {
+    const badge = a.match_type === 'manual' ? '<span class="confidence-badge manual">Manual</span>' : `<span class="confidence-badge auto">${Math.round((a.confidence||0)*100)}% auto</span>`;
+    html += `<div class="linked-item"><div class="linked-item-content">
+      <a href="${escHtml(a.url)}" target="_blank" rel="noopener">${escHtml((a.title||'').slice(0,120))}</a> ${badge}
+      <div class="linked-item-meta">${escHtml(a.source||'')} · ${a.published_at ? new Date(a.published_at).toLocaleDateString('en-GB') : ''}</div>
+    </div><button class="remove-link-btn" onclick="event.stopPropagation();removeLink('${escHtml(persistentId)}',${a.link_id})">Remove</button></div>`;
+  });
+  html += `<button class="add-link-btn" onclick="event.stopPropagation();openModal('${escHtml(persistentId)}','article')">+ Link article</button></div>`;
 
   panel.innerHTML = html;
 }
 
-async function removeLink(persistentId, linkId) {
-  try {
-    await fetch(`${BASE}/api/database/links/${linkId}`, { method: 'DELETE', credentials: 'include' });
-    loadCrimeDetail(persistentId);
-    loadStats();
-  } catch {}
+async function removeLink(pid, linkId) {
+  try { await fetch(`${BASE}/api/database/links/${linkId}`, { method: 'DELETE', credentials: 'include' }); loadDetail(pid, 'police'); loadStats(); } catch {}
 }
 
-// ─── Link search modal ───────────────────────────────
+// ─── Commit/Uncommit ──────────────────────────────────
+async function toggleCommit(persistentId, cb) {
+  cb.disabled = true;
+  const action = cb.checked ? 'commit' : 'uncommit';
+  try {
+    const r = await fetch(`${BASE}/api/database/crimes/${encodeURIComponent(persistentId)}/${action}`, { method: 'POST', credentials: 'include' });
+    const json = await r.json();
+    if (!json.success) { cb.checked = !cb.checked; }
+    else {
+      // Update local data
+      const item = feedData.find(i => i.id === persistentId && i.source === 'police');
+      if (item) {
+        item.is_committed = cb.checked;
+        if (json.summary) item.committed_summary = json.summary;
+        else item.committed_summary = null;
+      }
+      if (expandedId === persistentId) loadDetail(persistentId, 'police');
+      loadStats();
+    }
+  } catch { cb.checked = !cb.checked; }
+  cb.disabled = false;
+}
 
-function openModal(persistentId, tab) {
-  modalCrimeId = persistentId;
-  modalTab = tab;
-  modalPage = 1;
+// ─── Link Modal ───────────────────────────────────────
+function openModal(pid, tab) {
+  modalCrimeId = pid; modalTab = tab; modalPage = 1;
   document.getElementById('link-modal').classList.add('show');
   document.getElementById('modal-title').textContent = `Link ${tab} to crime`;
-  document.getElementById('modal-search').placeholder = `Search ${tab}s...`;
   document.getElementById('modal-search').value = '';
   switchModalTab(tab);
 }
-
-function closeModal() {
-  document.getElementById('link-modal').classList.remove('show');
-  modalCrimeId = null;
-}
+function closeModal() { document.getElementById('link-modal').classList.remove('show'); }
 
 function switchModalTab(tab) {
-  modalTab = tab;
-  modalPage = 1;
+  modalTab = tab; modalPage = 1;
   document.getElementById('tab-tweets').classList.toggle('active', tab === 'tweet');
   document.getElementById('tab-articles').classList.toggle('active', tab === 'article');
   document.getElementById('modal-search').placeholder = `Search ${tab}s...`;
@@ -757,204 +513,100 @@ function switchModalTab(tab) {
 }
 
 async function loadModalResults() {
-  const resultsEl = document.getElementById('modal-results');
-  resultsEl.innerHTML = '<div class="modal-loading">Loading...</div>';
-
+  const el = document.getElementById('modal-results');
+  el.innerHTML = '<div class="modal-loading">Loading...</div>';
   const search = document.getElementById('modal-search').value;
   const endpoint = modalTab === 'tweet' ? 'tweets' : 'articles';
   const params = new URLSearchParams({ page: modalPage, limit: 20 });
   if (search) params.set('search', search);
-
   try {
     const r = await fetch(`${BASE}/api/database/${endpoint}?${params}`, FETCH_OPTS);
     const json = await r.json();
-    const items = json.data || [];
-    const total = json.total || 0;
-    const totalPages = Math.ceil(total / 20) || 1;
-
-    if (items.length === 0) {
-      resultsEl.innerHTML = `<div class="modal-loading">No ${modalTab}s found</div>`;
-    } else {
-      let html = '';
+    const items = json.data || [], total = json.total || 0, totalPages = Math.ceil(total / 20) || 1;
+    if (items.length === 0) { el.innerHTML = `<div class="modal-loading">No ${modalTab}s found</div>`; }
+    else {
+      let h = '';
       items.forEach(item => {
         if (modalTab === 'tweet') {
-          html += `<div class="modal-result-item">
-            <div class="modal-result-text">
-              <div class="title">@${escHtml(item.author_username)}: ${escHtml((item.text || '').slice(0, 120))}</div>
-              <div class="meta">${item.created_at ? new Date(item.created_at).toLocaleString('en-GB') : ''} · ${item.area_name || 'no area'}</div>
-            </div>
-            <button class="link-btn" onclick="createLink('${escHtml(modalCrimeId)}', 'tweet', '${escHtml(item.tweet_id)}', this)">Link</button>
-          </div>`;
+          h += `<div class="modal-result-item"><div class="modal-result-text"><div class="title">@${escHtml(item.author_username)}: ${escHtml((item.text||'').slice(0,120))}</div><div class="meta">${item.created_at ? new Date(item.created_at).toLocaleString('en-GB') : ''}</div></div><button class="link-btn" onclick="createLink('${escHtml(modalCrimeId)}','tweet','${escHtml(item.tweet_id)}',this)">Link</button></div>`;
         } else {
-          html += `<div class="modal-result-item">
-            <div class="modal-result-text">
-              <div class="title">${escHtml((item.title || '').slice(0, 120))}</div>
-              <div class="meta">${escHtml(item.source || '')} · ${item.published_at ? new Date(item.published_at).toLocaleDateString('en-GB') : ''}</div>
-            </div>
-            <button class="link-btn" onclick="createLink('${escHtml(modalCrimeId)}', 'article', '${escHtml(item.guid)}', this)">Link</button>
-          </div>`;
+          h += `<div class="modal-result-item"><div class="modal-result-text"><div class="title">${escHtml((item.title||'').slice(0,120))}</div><div class="meta">${escHtml(item.source||'')} · ${item.published_at ? new Date(item.published_at).toLocaleDateString('en-GB') : ''}</div></div><button class="link-btn" onclick="createLink('${escHtml(modalCrimeId)}','article','${escHtml(item.guid)}',this)">Link</button></div>`;
         }
       });
-      resultsEl.innerHTML = html;
+      el.innerHTML = h;
     }
-
     document.getElementById('modal-page-info').textContent = `Page ${modalPage} of ${totalPages}`;
     document.getElementById('modal-prev').disabled = modalPage <= 1;
     document.getElementById('modal-next').disabled = modalPage >= totalPages;
-  } catch {
-    resultsEl.innerHTML = '<div class="modal-loading">Error loading results</div>';
-  }
+  } catch { el.innerHTML = '<div class="modal-loading">Error loading results</div>'; }
 }
 
-function modalChangePage(delta) {
-  modalPage = Math.max(1, modalPage + delta);
-  loadModalResults();
-}
+function modalChangePage(d) { modalPage = Math.max(1, modalPage + d); loadModalResults(); }
 
-async function createLink(crimeId, linkedType, linkedId, btn) {
-  btn.disabled = true;
-  btn.textContent = '...';
+async function createLink(crimeId, type, linkedId, btn) {
+  btn.disabled = true; btn.textContent = '...';
   try {
-    await fetch(`${BASE}/api/database/crimes/${encodeURIComponent(crimeId)}/links`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify({ linked_type: linkedType, linked_id: linkedId }),
-    });
-    btn.textContent = 'Linked';
-    btn.style.borderColor = '#4ade80';
-    btn.style.color = '#4ade80';
-    // Refresh the detail panel if visible
-    if (expandedCrimeId === crimeId) {
-      loadCrimeDetail(crimeId);
-    }
+    await fetch(`${BASE}/api/database/crimes/${encodeURIComponent(crimeId)}/links`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ linked_type: type, linked_id: linkedId }) });
+    btn.textContent = 'Linked'; btn.style.color = '#4ade80'; btn.style.borderColor = '#4ade80';
+    if (expandedId === crimeId) loadDetail(crimeId, 'police');
     loadStats();
-  } catch {
-    btn.textContent = 'Error';
-    btn.disabled = false;
-  }
+  } catch { btn.textContent = 'Error'; btn.disabled = false; }
 }
 
-// ─── Run correlation ──────────────────────────────────
-
+// ─── Correlation ──────────────────────────────────────
 async function runCorrelation() {
-  const btn = document.querySelector('.correlate-btn');
-  btn.textContent = 'Running...';
-  btn.disabled = true;
+  const btns = document.querySelectorAll('.action-btn.primary');
+  btns.forEach(b => { b.textContent = 'Running...'; b.disabled = true; });
   try {
     await fetch(`${BASE}/api/correlate`, { method: 'POST', credentials: 'include' });
-    loadStats();
-    loadCrimes();
-    btn.textContent = 'Done!';
-    setTimeout(() => { btn.textContent = 'Run Correlation'; btn.disabled = false; }, 2000);
-  } catch {
-    btn.textContent = 'Failed';
-    setTimeout(() => { btn.textContent = 'Run Correlation'; btn.disabled = false; }, 2000);
-  }
+    loadStats(); loadFeed();
+    btns.forEach(b => { b.textContent = 'Done!'; setTimeout(() => { b.textContent = 'Run Correlation'; b.disabled = false; }, 2000); });
+  } catch { btns.forEach(b => { b.textContent = 'Failed'; setTimeout(() => { b.textContent = 'Run Correlation'; b.disabled = false; }, 2000); }); }
 }
 
-// ─── Pagination ───────────────────────────────────────
-
+// ─── Pagination/Sort ──────────────────────────────────
 function renderPagination() {
-  const totalPages = Math.ceil(totalRecords / LIMIT) || 1;
-  document.getElementById('page-info').textContent =
-    `Showing ${((currentPage - 1) * LIMIT) + 1}–${Math.min(currentPage * LIMIT, totalRecords)} of ${totalRecords.toLocaleString()} records`;
+  const tp = Math.ceil(totalRecords / LIMIT) || 1;
+  document.getElementById('page-info').textContent = `Showing ${((currentPage-1)*LIMIT)+1}–${Math.min(currentPage*LIMIT,totalRecords)} of ${totalRecords.toLocaleString()}`;
   document.getElementById('btn-prev').disabled = currentPage <= 1;
-  document.getElementById('btn-next').disabled = currentPage >= totalPages;
+  document.getElementById('btn-next').disabled = currentPage >= tp;
 }
-
-function changePage(delta) {
-  expandedCrimeId = null;
-  currentPage = Math.max(1, currentPage + delta);
-  loadCrimes();
-  window.scrollTo({ top: 0, behavior: 'smooth' });
-}
-
-// ─── Sort ─────────────────────────────────────────────
-
+function changePage(d) { expandedId = null; currentPage = Math.max(1, currentPage + d); loadFeed(); window.scrollTo({ top: 0, behavior: 'smooth' }); }
 function sortBy(col) {
-  if (currentSort === col) {
-    currentOrder = currentOrder === 'ASC' ? 'DESC' : 'ASC';
-  } else {
-    currentSort = col;
-    currentOrder = col === 'link_count' ? 'DESC' : 'ASC';
-  }
-  currentPage = 1;
-  expandedCrimeId = null;
-  loadCrimes();
+  if (currentSort === col) currentOrder = currentOrder === 'ASC' ? 'DESC' : 'ASC';
+  else { currentSort = col; currentOrder = col === 'link_count' || col === 'max_confidence' ? 'DESC' : 'ASC'; }
+  currentPage = 1; expandedId = null; loadFeed();
 }
-
-// ─── View toggle ──────────────────────────────────────
-
-function setView(view) {
-  currentView = view;
-  document.getElementById('view-table').classList.toggle('hidden', view !== 'table');
-  document.getElementById('view-cards').classList.toggle('hidden', view !== 'cards');
-  document.getElementById('btn-table').classList.toggle('active', view === 'table');
-  document.getElementById('btn-cards').classList.toggle('active', view === 'cards');
-}
+function refreshAll() { expandedId = null; loadStats(); loadFeed(); }
 
 // ─── Export CSV ───────────────────────────────────────
-
 async function exportCsv() {
   const search = document.getElementById('search').value;
-  const category = document.getElementById('filter-category').value;
-  const month = document.getElementById('filter-month').value;
-
+  const source = document.getElementById('filter-source').value;
+  const linkStatus = document.getElementById('filter-links').value;
   const params = new URLSearchParams({ page: 1, limit: 10000, sort: currentSort, order: currentOrder });
   if (search) params.set('search', search);
-  if (category) params.set('category', category);
-  if (month) params.set('month', month);
-
+  if (source) params.set('source', source);
+  if (linkStatus) params.set('linkStatus', linkStatus);
   try {
-    const r = await fetch(`${BASE}/api/database/crimes?${params}`, FETCH_OPTS);
+    const r = await fetch(`${BASE}/api/database/feed?${params}`, FETCH_OPTS);
     const json = await r.json();
-    const crimes = json.data || [];
-
-    const header = 'Category,Street,Outcome,Month,Latitude,Longitude,Links\n';
-    const rows = crimes.map(c =>
-      `"${(c.category||'').replace(/-/g,' ')}","${c.street||''}","${(c.outcome||'').replace(/-/g,' ')}","${c.month||''}",${c.lat||''},${c.lng||''},${c.link_count||0}`
-    ).join('\n');
-
+    const items = json.data || [];
+    const header = 'Source,Description,Location,Date,Links,Confidence,Committed\n';
+    const rows = items.map(i => `"${i.source}","${(i.title||'').replace(/"/g,'""').slice(0,200)}","${i.location||''}","${i.date||''}",${i.link_count||0},${i.max_confidence?Math.round(i.max_confidence*100)+'%':''},${i.is_committed?'Yes':'No'}`).join('\n');
     const blob = new Blob([header + rows], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `lewisham-crimes-${new Date().toISOString().slice(0,10)}.csv`;
-    a.click();
+    const a = document.createElement('a'); a.href = url; a.download = `lewisham-intel-${new Date().toISOString().slice(0,10)}.csv`; a.click();
     URL.revokeObjectURL(url);
   } catch {}
 }
 
-// ─── Event listeners ──────────────────────────────────
-
-document.getElementById('search').addEventListener('input', () => {
-  clearTimeout(searchTimeout);
-  searchTimeout = setTimeout(() => { currentPage = 1; expandedCrimeId = null; loadCrimes(); }, 300);
-});
-
-document.getElementById('filter-category').addEventListener('change', () => { currentPage = 1; expandedCrimeId = null; loadCrimes(); });
-document.getElementById('filter-month').addEventListener('change', () => { currentPage = 1; expandedCrimeId = null; loadCrimes(); });
-
-document.getElementById('modal-search').addEventListener('input', () => {
-  clearTimeout(modalSearchTimeout);
-  modalSearchTimeout = setTimeout(() => { modalPage = 1; loadModalResults(); }, 300);
-});
-
-// Close modal on overlay click
-document.getElementById('link-modal').addEventListener('click', (e) => {
-  if (e.target === e.currentTarget) closeModal();
-});
-
-// ─── Refresh all ──────────────────────────────────────
-
-function refreshAll() {
-  expandedCrimeId = null;
-  loadStats();
-  loadCrimes();
-}
-
-// ─── Init ─────────────────────────────────────────────
+// ─── Event Listeners ──────────────────────────────────
+document.getElementById('search').addEventListener('input', () => { clearTimeout(searchTimeout); searchTimeout = setTimeout(() => { currentPage = 1; expandedId = null; loadFeed(); }, 300); });
+document.getElementById('filter-source').addEventListener('change', () => { currentPage = 1; expandedId = null; loadFeed(); });
+document.getElementById('filter-links').addEventListener('change', () => { currentPage = 1; expandedId = null; loadFeed(); });
+document.getElementById('modal-search').addEventListener('input', () => { clearTimeout(modalSearchTimeout); modalSearchTimeout = setTimeout(() => { modalPage = 1; loadModalResults(); }, 300); });
+document.getElementById('link-modal').addEventListener('click', (e) => { if (e.target === e.currentTarget) closeModal(); });
 
 window.addEventListener('load', checkSession);
 

@@ -467,6 +467,7 @@
         <button class="filter-btn" onclick="filterFeed('flood',this)">Flood</button>
         <button class="filter-btn" onclick="filterFeed('social',this)">Social</button>
         <button class="filter-btn" onclick="filterFeed('news',this)">News</button>
+        <button class="filter-btn" onclick="filterFeed('twitter',this)">Twitter</button>
       </div>
       <div class="feed-list" id="feed-list">
         <div class="loading-msg">Loading feed...</div>
@@ -502,6 +503,13 @@
       <div>
         <div class="source-name">Reddit · RSS News</div>
         <div class="source-desc" id="sd-reddit">Connecting...</div>
+      </div>
+    </div>
+    <div class="source-card">
+      <div class="status-dot dot-warn" id="s-twitter"></div>
+      <div>
+        <div class="source-name">Twitter / X</div>
+        <div class="source-desc" id="sd-twitter">Connecting...</div>
       </div>
     </div>
   </div>
@@ -797,12 +805,29 @@
 
   // ─── Load all ─────────────────────────────────────────
 
+  async function fetchTwitter() {
+    try {
+      const r = await fetch(`${BASE}/api/twitter`, FETCH_OPTS);
+      const { data } = await r.json();
+      const tweets = data.tweets || [];
+      if (data.error) {
+        setStatus('s-twitter', 'sd-twitter', 'warn', data.error);
+      } else {
+        setStatus('s-twitter', 'sd-twitter', 'ok', tweets.length + ' tweets fetched');
+      }
+      return tweets.map(t => ({ type: 'twitter', badge: 'Twitter', title: `@${t.author_username}: ${t.text?.slice(0,100)}`, meta: t.timeAgo || '', url: t.tweet_url, time: new Date(t.created_at) }));
+    } catch (err) {
+      setStatus('s-twitter', 'sd-twitter', 'err', 'Failed');
+      return [];
+    }
+  }
+
   async function loadAll() {
     document.getElementById('m-time').textContent = new Date().toLocaleTimeString('en-GB', { hour:'2-digit', minute:'2-digit' });
-    const [policeItems, tflItems, floodItems, socialItems, newsItems] = await Promise.all([
-      fetchPolice(), fetchTfl(), fetchFlood(), fetchSocial(), fetchNews()
+    const [policeItems, tflItems, floodItems, socialItems, newsItems, twitterItems] = await Promise.all([
+      fetchPolice(), fetchTfl(), fetchFlood(), fetchSocial(), fetchNews(), fetchTwitter()
     ]);
-    buildFeed([...policeItems, ...tflItems, ...floodItems, ...socialItems, ...newsItems]);
+    buildFeed([...policeItems, ...tflItems, ...floodItems, ...socialItems, ...newsItems, ...twitterItems]);
   }
 
   // ─── Init ─────────────────────────────────────────────
