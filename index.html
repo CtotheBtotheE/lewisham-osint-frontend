@@ -463,9 +463,23 @@
       });
   }
 
-  // Try fetching police data for a given YYYY-MM, returns array or null
-  async function tryPoliceMonth(dateStr) {
-    const url = `https://data.police.uk/api/crimes-street/all-crime?lat=${LEWISHAM.lat}&lng=${LEWISHAM.lng}&date=${dateStr}`;
+  // Query points spread across Lewisham borough for full coverage
+  const LEWISHAM_POINTS = [
+    { lat: 51.4613, lng: -0.0117 },  // Lewisham centre
+    { lat: 51.4530, lng: -0.0220 },  // Catford
+    { lat: 51.4740, lng: -0.0260 },  // Brockley
+    { lat: 51.4440, lng: -0.0150 },  // Downham
+    { lat: 51.4680, lng:  0.0020 },  // Blackheath / Lee
+    { lat: 51.4560, lng: -0.0400 },  // Forest Hill
+    { lat: 51.4810, lng: -0.0250 },  // New Cross
+    { lat: 51.4500, lng: -0.0500 },  // Sydenham
+    { lat: 51.4720, lng: -0.0050 },  // Hither Green
+    { lat: 51.4830, lng: -0.0100 },  // Deptford
+  ];
+
+  // Try fetching police data for a given YYYY-MM at a single point
+  async function tryPoliceMonth(lat, lng, dateStr) {
+    const url = `https://data.police.uk/api/crimes-street/all-crime?lat=${lat}&lng=${lng}&date=${dateStr}`;
     const r = await fetch(url);
     if (!r.ok) return null;
     const data = await r.json();
@@ -474,25 +488,34 @@
 
   async function fetchPolice() {
     try {
-      // Try current month, then go back up to 4 months to find available data
-      let raw = null;
+      // Find most recent available month (API has ~2 month delay)
       let usedMonth = '';
       const now = new Date();
       for (let i = 0; i < 5; i++) {
         const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
         const ym = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
-        raw = await tryPoliceMonth(ym);
-        if (raw) { usedMonth = ym; break; }
+        const test = await tryPoliceMonth(LEWISHAM.lat, LEWISHAM.lng, ym);
+        if (test) { usedMonth = ym; break; }
       }
-      if (!raw) throw new Error('No recent data');
+      if (!usedMonth) throw new Error('No recent data');
 
-      // Filter to last 30 days where the month field matches
-      const thirtyDaysAgo = new Date(now);
-      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-      const cutoffMonth = thirtyDaysAgo.getFullYear() + '-' + String(thirtyDaysAgo.getMonth() + 1).padStart(2, '0');
+      // Fetch crimes from all query points across the borough in parallel
+      const fetches = LEWISHAM_POINTS.map(p => tryPoliceMonth(p.lat, p.lng, usedMonth));
+      const results = await Promise.all(fetches);
 
-      // The API returns data by month — keep crimes from the most recent available month
-      const crimes = raw;
+      // Deduplicate by persistent_id (or by lat+lng+category as fallback)
+      const seen = new Set();
+      const crimes = [];
+      results.forEach(arr => {
+        if (!arr) return;
+        arr.forEach(c => {
+          const key = c.persistent_id || `${c.location?.latitude},${c.location?.longitude},${c.category}`;
+          if (!seen.has(key)) {
+            seen.add(key);
+            crimes.push(c);
+          }
+        });
+      });
 
       // Count categories
       const typeCounts = {};
@@ -511,7 +534,6 @@
         const category = (c.category || 'unknown').replace(/-/g, ' ');
         const street = c.location?.street?.name ?? 'Lewisham';
         const outcome = c.outcome_status?.category ?? 'Under investigation';
-        const policeUrl = 'https://www.police.uk/pu/your-area/metropolitan-police-service/lewisham/?tab=crime';
 
         L.circleMarker([lat, lng], {
           radius: 5, fillColor: CRIME_COLOR, color: CRIME_COLOR,
@@ -522,8 +544,7 @@
           `<b style="text-transform:capitalize">${category}</b><br>` +
           `${street}<br>` +
           `<small>${outcome}</small><br>` +
-          `<small>${usedMonth}</small><br>` +
-          `<a href="${policeUrl}" target="_blank" rel="noopener" style="color:#3b82f6;">View on police.uk</a>`
+          `<small>${usedMonth}</small>`
         )
         .addTo(map);
       });
