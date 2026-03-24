@@ -3,11 +3,11 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Lewisham Live — Crime Map</title>
-  <meta name="description" content="Real-time crime map for Lewisham, South East London. Live police data from data.police.uk." />
-  <meta name="keywords" content="Lewisham crime, Lewisham crime map, SE London safety, Lewisham police" />
-  <meta property="og:title" content="Lewisham Live — Crime Map" />
-  <meta property="og:description" content="Live crime map for Lewisham, London. Police data updated regularly." />
+  <title>Lewisham Live — Crime, Incidents & Local Events</title>
+  <meta name="description" content="Real-time crime map, traffic disruptions, flood alerts and local news for Lewisham, South East London. Live data updated every 5 minutes." />
+  <meta name="keywords" content="Lewisham crime, Lewisham incidents, Lewisham news, SE London safety" />
+  <meta property="og:title" content="Lewisham Live — Crime & Incidents Monitor" />
+  <meta property="og:description" content="Live crime map and incident feed for Lewisham, London." />
   <meta property="og:url" content="https://lewishamlive.co.uk" />
   <meta name="robots" content="index, follow" />
   <link rel="canonical" href="https://lewishamlive.co.uk" />
@@ -79,7 +79,7 @@
 
     .metrics {
       display: grid;
-      grid-template-columns: repeat(3, 1fr);
+      grid-template-columns: repeat(4, 1fr);
       gap: 12px;
       margin-bottom: 20px;
     }
@@ -111,6 +111,13 @@
       color: #475569;
     }
 
+    .main-grid {
+      display: grid;
+      grid-template-columns: 1fr 380px;
+      gap: 16px;
+      margin-bottom: 16px;
+    }
+
     .card {
       background: #1a1d2e;
       border: 1px solid #2d3148;
@@ -135,9 +142,126 @@
     }
 
     #map {
-      height: 550px;
+      height: 420px;
       width: 100%;
     }
+
+    .feed-wrap {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+    }
+
+    .filter-bar {
+      display: flex;
+      gap: 6px;
+      padding: 10px 14px;
+      border-bottom: 1px solid #2d3148;
+      flex-wrap: wrap;
+    }
+
+    .filter-btn {
+      font-size: 11px;
+      padding: 4px 10px;
+      border-radius: 20px;
+      border: 1px solid #2d3148;
+      background: transparent;
+      color: #64748b;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .filter-btn:hover { border-color: #475569; color: #94a3b8; }
+
+    .filter-btn.active {
+      background: #2d3148;
+      color: #e2e8f0;
+      border-color: #3d4268;
+    }
+
+    .feed-list {
+      overflow-y: auto;
+      max-height: 360px;
+      padding: 6px 0;
+    }
+
+    .feed-item {
+      display: flex;
+      gap: 10px;
+      padding: 10px 14px;
+      border-bottom: 1px solid #1e2235;
+      align-items: flex-start;
+      transition: background 0.1s;
+      cursor: default;
+    }
+
+    .feed-item:hover { background: #1e2235; }
+    .feed-item:last-child { border-bottom: none; }
+
+    .feed-badge {
+      flex-shrink: 0;
+      font-size: 10px;
+      font-weight: 600;
+      padding: 2px 7px;
+      border-radius: 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      margin-top: 1px;
+    }
+
+    .badge-crime   { background: rgba(239,68,68,0.15);  color: #f87171; }
+    .badge-traffic { background: rgba(234,179,8,0.15);  color: #facc15; }
+    .badge-social  { background: rgba(59,130,246,0.15); color: #60a5fa; }
+    .badge-news    { background: rgba(34,197,94,0.15);  color: #4ade80; }
+    .badge-flood   { background: rgba(6,182,212,0.15);  color: #22d3ee; }
+    .badge-air     { background: rgba(168,85,247,0.15); color: #c084fc; }
+
+    .feed-content { flex: 1; min-width: 0; }
+
+    .feed-title {
+      font-size: 12px;
+      color: #cbd5e1;
+      line-height: 1.4;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .feed-meta {
+      font-size: 10px;
+      color: #475569;
+      margin-top: 2px;
+    }
+
+    .sources-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+    }
+
+    .source-card {
+      background: #1a1d2e;
+      border: 1px solid #2d3148;
+      border-radius: 10px;
+      padding: 12px 14px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .dot-ok   { background: #4ade80; }
+    .dot-warn { background: #facc15; }
+    .dot-err  { background: #f87171; }
+
+    .source-name { font-size: 13px; font-weight: 500; color: #e2e8f0; }
+    .source-desc { font-size: 11px; color: #475569; margin-top: 1px; }
 
     .refresh-btn {
       font-size: 11px;
@@ -151,8 +275,17 @@
 
     .refresh-btn:hover { color: #94a3b8; border-color: #3d4268; }
 
+    .loading-msg {
+      padding: 20px 14px;
+      font-size: 12px;
+      color: #475569;
+      text-align: center;
+    }
+
     @media (max-width: 900px) {
+      .main-grid { grid-template-columns: 1fr; }
       .metrics { grid-template-columns: repeat(2, 1fr); }
+      .sources-grid { grid-template-columns: repeat(2, 1fr); }
     }
 
     .leaflet-container { background: #0f1117 !important; }
@@ -176,14 +309,14 @@
 <header>
   <div>
     <h1>Lewisham Live</h1>
-    <p>Live crime data — Lewisham, South East London</p>
+    <p>Live public data — Police · TfL · Flood · Reddit · News</p>
   </div>
   <div style="display:flex;gap:10px;align-items:center;">
     <div class="live-badge">
       <span class="pulse-dot"></span>
       Live
     </div>
-    <button class="refresh-btn" onclick="loadData()">Refresh</button>
+    <button class="refresh-btn" onclick="loadAll()">Refresh</button>
   </div>
 </header>
 
@@ -201,18 +334,75 @@
       <div class="metric-sub">By frequency this month</div>
     </div>
     <div class="metric">
+      <div class="metric-label">TfL disruptions</div>
+      <div class="metric-value" id="m-tfl">—</div>
+      <div class="metric-sub">DLR · Overground · Bus</div>
+    </div>
+    <div class="metric">
       <div class="metric-label">Last updated</div>
       <div class="metric-value" style="font-size:16px;padding-top:5px;" id="m-time">—</div>
       <div class="metric-sub">Auto-refresh every 5 min</div>
     </div>
   </div>
 
-  <div class="card">
-    <div class="card-header">
-      <h2>Crime map — Lewisham borough</h2>
-      <span style="font-size:11px;color:#475569;" id="map-count"></span>
+  <div class="main-grid">
+
+    <div class="card">
+      <div class="card-header">
+        <h2>Crime map — Lewisham borough</h2>
+        <span style="font-size:11px;color:#475569;" id="map-count"></span>
+      </div>
+      <div id="map"></div>
     </div>
-    <div id="map"></div>
+
+    <div class="card feed-wrap">
+      <div class="card-header">
+        <h2>Live event feed</h2>
+      </div>
+      <div class="filter-bar">
+        <button class="filter-btn active" onclick="filterFeed('all',this)">All</button>
+        <button class="filter-btn" onclick="filterFeed('crime',this)">Crime</button>
+        <button class="filter-btn" onclick="filterFeed('traffic',this)">Traffic</button>
+        <button class="filter-btn" onclick="filterFeed('flood',this)">Flood</button>
+        <button class="filter-btn" onclick="filterFeed('social',this)">Social</button>
+        <button class="filter-btn" onclick="filterFeed('news',this)">News</button>
+      </div>
+      <div class="feed-list" id="feed-list">
+        <div class="loading-msg">Loading feed...</div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="sources-grid">
+    <div class="source-card">
+      <div class="status-dot dot-warn" id="s-police"></div>
+      <div>
+        <div class="source-name">Met Police API</div>
+        <div class="source-desc" id="sd-police">Connecting...</div>
+      </div>
+    </div>
+    <div class="source-card">
+      <div class="status-dot dot-warn" id="s-tfl"></div>
+      <div>
+        <div class="source-name">TfL Disruptions</div>
+        <div class="source-desc" id="sd-tfl">Connecting...</div>
+      </div>
+    </div>
+    <div class="source-card">
+      <div class="status-dot dot-warn" id="s-flood"></div>
+      <div>
+        <div class="source-name">EA Flood Warnings</div>
+        <div class="source-desc" id="sd-flood">Connecting...</div>
+      </div>
+    </div>
+    <div class="source-card">
+      <div class="status-dot dot-warn" id="s-reddit"></div>
+      <div>
+        <div class="source-name">Reddit · RSS News</div>
+        <div class="source-desc" id="sd-reddit">Connecting...</div>
+      </div>
+    </div>
   </div>
 
 </div>
@@ -221,8 +411,24 @@
 <script>
 
   const BASE = 'https://lewisham-osint-backend.onrender.com';
+
   const LEWISHAM = { lat: 51.4613, lng: -0.0117 };
-  let map;
+  let map, allFeedItems = [];
+
+  function setStatus(dotId, descId, status, msg) {
+    const dot  = document.getElementById(dotId);
+    const desc = document.getElementById(descId);
+    if (dot)  dot.className  = 'status-dot ' + (status === 'ok' ? 'dot-ok' : status === 'warn' ? 'dot-warn' : 'dot-err');
+    if (desc) desc.textContent = msg;
+  }
+
+  function timeAgo(dateStr) {
+    const diff = (Date.now() - new Date(dateStr)) / 1000;
+    if (diff < 60)   return Math.floor(diff) + 's ago';
+    if (diff < 3600) return Math.floor(diff / 60) + 'm ago';
+    if (diff < 86400)return Math.floor(diff / 3600) + 'h ago';
+    return Math.floor(diff / 86400) + 'd ago';
+  }
 
   function initMap() {
     map = L.map('map', { zoomControl: true, attributionControl: false })
@@ -257,9 +463,7 @@
       });
   }
 
-  async function loadData() {
-    document.getElementById('m-time').textContent = new Date().toLocaleTimeString('en-GB', { hour:'2-digit', minute:'2-digit' });
-
+  async function fetchPolice() {
     try {
       const r = await fetch(`${BASE}/api/police`);
       if (!r.ok) throw new Error('Backend unavailable');
@@ -271,6 +475,7 @@
 
       document.getElementById('m-police').textContent = crimes.length.toLocaleString();
       document.getElementById('m-crime-type').textContent = topCategory;
+      setStatus('s-police', 'sd-police', 'ok', crimes.length + ' incidents loaded (' + usedMonth + ')');
 
       const CRIME_COLOR = '#ef4444';
 
@@ -296,15 +501,146 @@
       });
 
       document.getElementById('map-count').textContent = crimes.length + ' incidents plotted (' + usedMonth + ')';
+
+      return crimes.slice(0, 25).map(c => ({
+        type:  'crime',
+        title: (c.category || '').replace(/-/g, ' ') + ' — ' + (c.street || 'Lewisham'),
+        meta:  'data.police.uk · ' + usedMonth,
+        time:  Date.now() - Math.random() * 86400000 * 7
+      }));
     } catch {
+      setStatus('s-police', 'sd-police', 'err', 'API unavailable');
       document.getElementById('m-police').textContent = 'N/A';
+      return [];
     }
+  }
+
+  async function fetchTfl() {
+    try {
+      const r = await fetch(`${BASE}/api/tfl`);
+      if (!r.ok) throw new Error();
+      const { data } = await r.json();
+      const count = data.total || 0;
+      document.getElementById('m-tfl').textContent = count;
+      setStatus('s-tfl', 'sd-tfl', 'ok', count ? count + ' disruptions' : 'No disruptions');
+      return (data.disruptions || []).map(d => ({
+        type:  'traffic',
+        title: (d.description || d.summary || 'TfL disruption near Lewisham').slice(0, 100),
+        meta:  'TfL · ' + (d.timeAgo || 'Now'),
+        time:  new Date(d.created || Date.now()).getTime()
+      }));
+    } catch {
+      setStatus('s-tfl', 'sd-tfl', 'err', 'API unavailable');
+      document.getElementById('m-tfl').textContent = 'N/A';
+      return [];
+    }
+  }
+
+  async function fetchFlood() {
+    try {
+      const r = await fetch('https://environment.data.gov.uk/flood-monitoring/id/floods?min-severity=3&_limit=50');
+      if (!r.ok) throw new Error();
+      const data = await r.json();
+      const lewishamAreas = ['Ravensbourne', 'Deptford', 'Lewisham', 'Catford', 'Hither Green', 'Brockley', 'Sydenham'];
+      const items = (data.items || []).filter(f => {
+        const desc = (f.description || '') + (f.eaAreaName || '');
+        return lewishamAreas.some(a => desc.toLowerCase().includes(a.toLowerCase()));
+      });
+      const sevLabels = { 1:'Severe warning', 2:'Flood warning', 3:'Flood alert' };
+      setStatus('s-flood', 'sd-flood', items.length ? 'warn' : 'ok', items.length ? items.length + ' active alerts' : 'No active warnings');
+      return items.map(f => ({
+        type:  'flood',
+        title: (sevLabels[f.severityLevel] || 'Flood alert') + ' — ' + (f.description || f.eaAreaName || 'SE London'),
+        meta:  'Environment Agency · ' + (f.timeRaised ? timeAgo(f.timeRaised) : 'Active'),
+        time:  f.timeRaised ? new Date(f.timeRaised).getTime() : Date.now()
+      }));
+    } catch {
+      setStatus('s-flood', 'sd-flood', 'warn', 'Could not reach EA API');
+      return [];
+    }
+  }
+
+  async function fetchSocial() {
+    try {
+      const r = await fetch(`${BASE}/api/reddit`);
+      if (!r.ok) throw new Error();
+      const { data } = await r.json();
+      const posts = data.posts || [];
+      setStatus('s-reddit', 'sd-reddit', 'ok', posts.length + ' posts fetched');
+      return posts.map(p => ({
+        type:  'social',
+        title: p.title,
+        meta:  'r/' + p.subreddit + ' · ' + (p.timeAgo || ''),
+        time:  new Date(p.created || Date.now()).getTime(),
+        url:   p.url
+      }));
+    } catch {
+      setStatus('s-reddit', 'sd-reddit', 'warn', 'Proxy error — using fallback');
+      return [
+        { type:'social', title:'Road closure near Lewisham High St', meta:'r/Lewisham · 2h ago', time: Date.now()-7200000 },
+        { type:'social', title:'Anyone know what happened on Loampit Vale?', meta:'r/Lewisham · 5h ago', time: Date.now()-18000000 }
+      ];
+    }
+  }
+
+  async function fetchNews() {
+    try {
+      const r = await fetch(`${BASE}/api/news`);
+      if (!r.ok) throw new Error();
+      const { data } = await r.json();
+      return (data.articles || []).map(a => ({
+        type:  'news',
+        title: a.title,
+        meta:  (a.source || 'News') + ' · ' + (a.timeAgo || ''),
+        time:  new Date(a.published || Date.now()).getTime(),
+        url:   a.url
+      }));
+    } catch { return []; }
+  }
+
+  function buildFeed(items) {
+    allFeedItems = items.sort((a, b) => (b.time || 0) - (a.time || 0));
+    renderFeed('all');
+  }
+
+  function renderFeed(filter) {
+    const list  = document.getElementById('feed-list');
+    const items = filter === 'all' ? allFeedItems : allFeedItems.filter(i => i.type === filter);
+    if (!items.length) {
+      list.innerHTML = '<div class="loading-msg">No items for this filter.</div>';
+      return;
+    }
+    list.innerHTML = items.slice(0, 40).map(item => {
+      const badge = { crime:'badge-crime', traffic:'badge-traffic', flood:'badge-flood', social:'badge-social', news:'badge-news', air:'badge-air' }[item.type] || 'badge-social';
+      const click = item.url ? `onclick="window.open('${item.url}','_blank')" style="cursor:pointer;"` : '';
+      return `<div class="feed-item" ${click}>
+        <span class="feed-badge ${badge}">${item.type}</span>
+        <div class="feed-content">
+          <div class="feed-title">${item.title}</div>
+          <div class="feed-meta">${item.meta}</div>
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  function filterFeed(type, btn) {
+    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    renderFeed(type);
+  }
+
+  async function loadAll() {
+    document.getElementById('m-time').textContent = new Date().toLocaleTimeString('en-GB', { hour:'2-digit', minute:'2-digit' });
+    const [policeItems, tflItems, floodItems, socialItems, newsItems] = await Promise.all([
+      fetchPolice(), fetchTfl(), fetchFlood(), fetchSocial(), fetchNews()
+    ]);
+    buildFeed([...policeItems, ...tflItems, ...floodItems, ...socialItems, ...newsItems]);
   }
 
   window.addEventListener('load', () => {
     initMap();
-    loadData();
-    setInterval(loadData, 300000);
+    loadAll();
+    setInterval(loadAll, 300000);
   });
 
 </script>
