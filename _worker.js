@@ -50,6 +50,12 @@ export default {
       });
     }
 
+    // Serve public site at root
+    if (path === '/' || path === '') {
+      url.pathname = '/_public.html';
+      return env.ASSETS.fetch(new Request(url.toString(), request));
+    }
+
     // Default: static asset serving
     return env.ASSETS.fetch(request);
   },
