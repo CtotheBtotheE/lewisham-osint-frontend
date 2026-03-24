@@ -104,6 +104,23 @@
       box-shadow: 0 2px 8px rgba(0,0,0,0.5);
     }
     .crime-tooltip::before { border-top-color: #ef4444 !important; }
+
+    /* Dark-themed Leaflet popups */
+    .leaflet-popup-content-wrapper {
+      background: #1a1d2e !important;
+      border: 1px solid #2d3148 !important;
+      border-radius: 10px !important;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.6) !important;
+      color: #e2e8f0 !important;
+      padding: 0 !important;
+    }
+    .leaflet-popup-content { margin: 0 !important; width: auto !important; }
+    .leaflet-popup-tip { background: #1a1d2e !important; border: 1px solid #2d3148 !important; }
+    .leaflet-popup-close-button {
+      color: #64748b !important; font-size: 18px !important;
+      top: 6px !important; right: 8px !important;
+    }
+    .leaflet-popup-close-button:hover { color: #e2e8f0 !important; }
   </style>
 </head>
 <body>
@@ -158,6 +175,7 @@
   const BASE = 'https://lewisham-osint-backend.onrender.com';
   const LEWISHAM = { lat: 51.4613, lng: -0.0117 };
   let map;
+  let crimeLayer;
 
   function initMap() {
     map = L.map('map', { zoomControl: true, attributionControl: false })
@@ -166,6 +184,8 @@
     L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
       maxZoom: 19
     }).addTo(map);
+
+    crimeLayer = L.layerGroup().addTo(map);
 
     fetch('https://mapit.mysociety.org/area/2492.geojson?simplify_tolerance=0.001')
       .then(r => r.json())
@@ -180,6 +200,103 @@
           radius: 3000, color: '#3b82f6', fillColor: '#3b82f6', fillOpacity: 0.05, weight: 1
         }).addTo(map);
       });
+  }
+
+  function escHtml(str) {
+    const d = document.createElement('div');
+    d.textContent = str || '';
+    return d.innerHTML;
+  }
+
+  function relativeTime(dateStr) {
+    if (!dateStr) return '';
+    const seconds = Math.floor((Date.now() - new Date(dateStr)) / 1000);
+    if (seconds < 60) return seconds + 's ago';
+    if (seconds < 3600) return Math.floor(seconds / 60) + 'm ago';
+    if (seconds < 86400) return Math.floor(seconds / 3600) + 'h ago';
+    return Math.floor(seconds / 86400) + 'd ago';
+  }
+
+  function buildPopupHtml(crime, tweets, articles) {
+    const category = escHtml((crime.category || '').replace(/-/g, ' '));
+    const street = escHtml(crime.street || 'Unknown');
+    const outcome = escHtml((crime.outcome || 'Under investigation').replace(/-/g, ' '));
+    const month = escHtml(crime.month || '');
+
+    let html = '<div style="width:300px;font-family:-apple-system,BlinkMacSystemFont,\'Segoe UI\',sans-serif;">';
+
+    // Crime header
+    html += '<div style="padding:12px 14px;border-bottom:1px solid #2d3148;">';
+    html += `<div style="font-size:13px;font-weight:700;color:#f87171;text-transform:capitalize;">${category}</div>`;
+    html += `<div style="font-size:12px;color:#cbd5e1;margin-top:3px;text-transform:capitalize;">${street}</div>`;
+    html += `<div style="font-size:10px;color:#64748b;margin-top:3px;">${outcome} &middot; ${month}</div>`;
+    html += '</div>';
+
+    // Linked tweets
+    if (tweets && tweets.length > 0) {
+      html += '<div style="padding:10px 14px;border-bottom:1px solid #2d3148;">';
+      html += `<div style="font-size:10px;color:#3b82f6;font-weight:700;letter-spacing:0.05em;margin-bottom:6px;">LINKED TWEETS (${tweets.length})</div>`;
+      tweets.forEach(t => {
+        const tweetText = escHtml((t.text || '').slice(0, 140));
+        const username = escHtml(t.author_username || 'unknown');
+        const tweetTime = relativeTime(t.created_at);
+        const tweetUrl = escHtml(t.tweet_url || '#');
+
+        html += '<div style="margin-bottom:8px;padding-bottom:8px;border-bottom:1px solid #1e2235;">';
+        html += `<div style="font-size:10px;color:#64748b;">`;
+        html += `<a href="${tweetUrl}" target="_blank" rel="noopener" style="color:#60a5fa;text-decoration:none;font-weight:600;">@${username}</a>`;
+        html += ` &middot; ${tweetTime}`;
+        if (t.confidence) html += ` &middot; <span style="color:#facc15;">${Math.round(t.confidence * 100)}% match</span>`;
+        html += '</div>';
+        html += `<div style="font-size:11px;color:#cbd5e1;margin-top:3px;line-height:1.4;">${tweetText}</div>`;
+
+        // Media thumbnail
+        if (t.media_urls && t.media_urls.length > 0 && t.media_urls[0]) {
+          html += `<img src="${escHtml(t.media_urls[0])}" style="width:100%;border-radius:6px;margin-top:6px;max-height:120px;object-fit:cover;" loading="lazy" alt="Tweet media" onerror="this.style.display='none'" />`;
+        }
+
+        // Engagement
+        if (t.metrics_likes > 0 || t.metrics_retweets > 0) {
+          html += '<div style="font-size:9px;color:#475569;margin-top:4px;">';
+          if (t.metrics_likes > 0) html += `${t.metrics_likes} likes`;
+          if (t.metrics_likes > 0 && t.metrics_retweets > 0) html += ' &middot; ';
+          if (t.metrics_retweets > 0) html += `${t.metrics_retweets} retweets`;
+          html += '</div>';
+        }
+
+        html += '</div>';
+      });
+      html += '</div>';
+    }
+
+    // Linked articles
+    if (articles && articles.length > 0) {
+      html += '<div style="padding:10px 14px;">';
+      html += `<div style="font-size:10px;color:#4ade80;font-weight:700;letter-spacing:0.05em;margin-bottom:6px;">LINKED NEWS (${articles.length})</div>`;
+      articles.forEach(a => {
+        const title = escHtml((a.title || '').slice(0, 100));
+        const source = escHtml(a.source || 'News');
+        const articleUrl = escHtml(a.url || '#');
+        const pubDate = a.published_at ? new Date(a.published_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : '';
+
+        html += '<div style="margin-bottom:6px;">';
+        html += `<a href="${articleUrl}" target="_blank" rel="noopener" style="font-size:11px;color:#60a5fa;text-decoration:none;line-height:1.3;display:block;">${title}</a>`;
+        html += `<div style="font-size:9px;color:#475569;margin-top:2px;">${source}`;
+        if (pubDate) html += ` &middot; ${pubDate}`;
+        if (a.confidence) html += ` &middot; <span style="color:#facc15;">${Math.round(a.confidence * 100)}%</span>`;
+        html += '</div>';
+        html += '</div>';
+      });
+      html += '</div>';
+    }
+
+    // No links
+    if ((!tweets || tweets.length === 0) && (!articles || articles.length === 0)) {
+      html += '<div style="padding:10px 14px;font-size:10px;color:#475569;text-align:center;">No linked intelligence yet</div>';
+    }
+
+    html += '</div>';
+    return html;
   }
 
   async function loadData() {
@@ -198,6 +315,7 @@
       document.getElementById('m-crime-type').textContent = topCategory;
 
       const CRIME_COLOR = '#ef4444';
+      crimeLayer.clearLayers();
 
       crimes.forEach(c => {
         const lat = c.lat + (Math.random() - 0.5) * 0.0005;
@@ -205,19 +323,45 @@
         const category = (c.category || 'unknown').replace(/-/g, ' ');
         const street = c.street || 'Lewisham';
         const outcome = c.outcome || 'Under investigation';
+        const crimeId = c.id;
 
-        L.circleMarker([lat, lng], {
+        const marker = L.circleMarker([lat, lng], {
           radius: 5, fillColor: CRIME_COLOR, color: CRIME_COLOR,
           weight: 0.5, fillOpacity: 0.75
         })
         .bindTooltip(category, { direction: 'top', className: 'crime-tooltip' })
-        .bindPopup(
-          `<b style="text-transform:capitalize">${category}</b><br>` +
-          `${street}<br>` +
-          `<small>${outcome}</small><br>` +
-          `<small>${usedMonth}</small>`
-        )
-        .addTo(map);
+        .bindPopup('<div style="padding:14px;font-size:11px;color:#64748b;">Loading intelligence...</div>', {
+          maxWidth: 320,
+          minWidth: 280,
+          className: 'crime-popup',
+        });
+
+        // Lazy-load enriched popup on click
+        marker.on('popupopen', async function() {
+          if (!crimeId) {
+            marker.setPopupContent(buildPopupHtml(
+              { category: c.category, street, outcome, month: usedMonth }, [], []
+            ));
+            return;
+          }
+          try {
+            const resp = await fetch(`${BASE}/api/police/crime/${encodeURIComponent(crimeId)}/links`);
+            if (!resp.ok) throw new Error('Failed to load');
+            const json = await resp.json();
+            const d = json.data || {};
+            marker.setPopupContent(buildPopupHtml(
+              d.crime || { category: c.category, street, outcome, month: usedMonth },
+              d.tweets || [],
+              d.articles || []
+            ));
+          } catch {
+            marker.setPopupContent(buildPopupHtml(
+              { category: c.category, street, outcome, month: usedMonth }, [], []
+            ));
+          }
+        });
+
+        marker.addTo(crimeLayer);
       });
 
       document.getElementById('map-count').textContent = crimes.length + ' incidents plotted (' + usedMonth + ')';
