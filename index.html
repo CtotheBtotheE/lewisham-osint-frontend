@@ -287,6 +287,19 @@
     }
 
     .leaflet-container { background: #0f1117 !important; }
+
+    .crime-tooltip {
+      background: #1a1d2e;
+      color: #f87171;
+      border: 1px solid #ef4444;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: capitalize;
+      padding: 3px 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.5);
+    }
+    .crime-tooltip::before { border-top-color: #ef4444 !important; }
   </style>
 </head>
 <body>
@@ -448,44 +461,77 @@
       });
   }
 
+  // Try fetching police data for a given YYYY-MM, returns array or null
+  async function tryPoliceMonth(dateStr) {
+    const url = `https://data.police.uk/api/crimes-street/all-crime?lat=${LEWISHAM.lat}&lng=${LEWISHAM.lng}&date=${dateStr}`;
+    const r = await fetch(url);
+    if (!r.ok) return null;
+    const data = await r.json();
+    return data.length ? data : null;
+  }
+
   async function fetchPolice() {
     try {
-      const r = await fetch(`${BASE}/api/police`);
-      if (!r.ok) throw new Error();
-      const { data } = await r.json();
+      // Try current month, then go back up to 4 months to find available data
+      let raw = null;
+      let usedMonth = '';
+      const now = new Date();
+      for (let i = 0; i < 5; i++) {
+        const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        const ym = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+        raw = await tryPoliceMonth(ym);
+        if (raw) { usedMonth = ym; break; }
+      }
+      if (!raw) throw new Error('No recent data');
 
-      document.getElementById('m-police').textContent     = (data.total || 0).toLocaleString();
-      document.getElementById('m-crime-type').textContent = (data.topCategory || '—').replace(/-/g, ' ');
-      setStatus('s-police', 'sd-police', 'ok', data.total + ' incidents loaded');
+      // Filter to last 30 days where the month field matches
+      const thirtyDaysAgo = new Date(now);
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      const cutoffMonth = thirtyDaysAgo.getFullYear() + '-' + String(thirtyDaysAgo.getMonth() + 1).padStart(2, '0');
 
-      const colours = {
-        'violent-crime':         '#ef4444',
-        'burglary':              '#f97316',
-        'theft-from-the-person': '#eab308',
-        'drugs':                 '#a855f7',
-        'anti-social-behaviour': '#3b82f6',
-        'vehicle-crime':         '#22c55e',
-        'robbery':               '#ec4899',
-      };
+      // The API returns data by month — keep crimes from the most recent available month
+      const crimes = raw;
 
-      (data.incidents || []).slice(0, 120).forEach(c => {
-        const lat = c.lat + (Math.random() - 0.5) * 0.003;
-        const lng = c.lng + (Math.random() - 0.5) * 0.003;
-        const col = colours[c.category] || '#64748b';
+      // Count categories
+      const typeCounts = {};
+      crimes.forEach(c => { typeCounts[c.category] = (typeCounts[c.category] || 0) + 1; });
+      const topCategory = Object.entries(typeCounts).sort((a, b) => b[1] - a[1])[0]?.[0] ?? 'unknown';
+
+      document.getElementById('m-police').textContent = crimes.length.toLocaleString();
+      document.getElementById('m-crime-type').textContent = topCategory.replace(/-/g, ' ');
+      setStatus('s-police', 'sd-police', 'ok', crimes.length + ' incidents loaded (' + usedMonth + ')');
+
+      const CRIME_COLOR = '#ef4444'; // red
+
+      crimes.forEach(c => {
+        const lat = parseFloat(c.location?.latitude ?? LEWISHAM.lat) + (Math.random() - 0.5) * 0.0005;
+        const lng = parseFloat(c.location?.longitude ?? LEWISHAM.lng) + (Math.random() - 0.5) * 0.0005;
+        const category = (c.category || 'unknown').replace(/-/g, ' ');
+        const street = c.location?.street?.name ?? 'Lewisham';
+        const outcome = c.outcome_status?.category ?? 'Under investigation';
+        const policeUrl = 'https://www.police.uk/pu/your-area/metropolitan-police-service/lewisham/?tab=crime';
+
         L.circleMarker([lat, lng], {
-          radius: 5, fillColor: col, color: col,
+          radius: 5, fillColor: CRIME_COLOR, color: CRIME_COLOR,
           weight: 0.5, fillOpacity: 0.75
-        }).addTo(map).bindPopup(
-          `<b>${(c.category || '').replace(/-/g,' ')}</b><br>${c.street || 'Lewisham'}<br><small>${c.month || ''}</small>`
-        );
+        })
+        .bindTooltip(category, { direction: 'top', className: 'crime-tooltip' })
+        .bindPopup(
+          `<b style="text-transform:capitalize">${category}</b><br>` +
+          `${street}<br>` +
+          `<small>${outcome}</small><br>` +
+          `<small>${usedMonth}</small><br>` +
+          `<a href="${policeUrl}" target="_blank" rel="noopener" style="color:#3b82f6;">View on police.uk</a>`
+        )
+        .addTo(map);
       });
 
-      document.getElementById('map-count').textContent = (data.incidents || []).length + ' incidents plotted';
+      document.getElementById('map-count').textContent = crimes.length + ' incidents plotted (' + usedMonth + ')';
 
-      return (data.incidents || []).slice(0, 25).map(c => ({
+      return crimes.slice(0, 25).map(c => ({
         type:  'crime',
-        title: (c.category || '').replace(/-/g, ' ') + ' — ' + (c.street || 'Lewisham'),
-        meta:  'data.police.uk · ' + (c.month || ''),
+        title: (c.category || '').replace(/-/g, ' ') + ' — ' + (c.location?.street?.name || 'Lewisham'),
+        meta:  'data.police.uk · ' + usedMonth,
         time:  Date.now() - Math.random() * 86400000 * 7
       }));
     } catch {
