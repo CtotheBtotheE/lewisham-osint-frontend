@@ -20,6 +20,12 @@ export default {
       return env.ASSETS.fetch(new Request(url.toString(), request));
     }
 
+    // Serve analytics page at /admin/analytics
+    if (url.pathname === '/admin/analytics' || url.pathname === '/admin/analytics/') {
+      url.pathname = '/analytics.html';
+      return env.ASSETS.fetch(new Request(url.toString(), request));
+    }
+
     // Everything else: default static asset serving (index.html for /)
     return env.ASSETS.fetch(request);
   },

@@ -416,6 +416,7 @@
       Live
     </div>
     <a href="/admin/database" class="refresh-btn" style="text-decoration:none;">Database</a>
+    <a href="/admin/analytics" class="refresh-btn" style="text-decoration:none;">Analytics</a>
     <button class="refresh-btn" onclick="loadAll()">Refresh</button>
     <button class="logout-btn" onclick="logout()">Logout</button>
   </div>
@@ -468,6 +469,9 @@
         <button class="filter-btn" onclick="filterFeed('social',this)">Social</button>
         <button class="filter-btn" onclick="filterFeed('news',this)">News</button>
         <button class="filter-btn" onclick="filterFeed('twitter',this)">Twitter</button>
+        <button class="filter-btn" onclick="filterFeed('road',this)">Roads</button>
+        <button class="filter-btn" onclick="filterFeed('bluesky',this)">Bluesky</button>
+        <button class="filter-btn" onclick="filterFeed('lfb',this)">LFB</button>
       </div>
       <div class="feed-list" id="feed-list">
         <div class="loading-msg">Loading feed...</div>
@@ -510,6 +514,27 @@
       <div>
         <div class="source-name">Twitter / X</div>
         <div class="source-desc" id="sd-twitter">Connecting...</div>
+      </div>
+    </div>
+    <div class="source-card">
+      <div class="status-dot dot-warn" id="s-tflroads"></div>
+      <div>
+        <div class="source-name">TfL Road Incidents</div>
+        <div class="source-desc" id="sd-tflroads">Connecting...</div>
+      </div>
+    </div>
+    <div class="source-card">
+      <div class="status-dot dot-warn" id="s-bluesky"></div>
+      <div>
+        <div class="source-name">Bluesky</div>
+        <div class="source-desc" id="sd-bluesky">Connecting...</div>
+      </div>
+    </div>
+    <div class="source-card">
+      <div class="status-dot dot-warn" id="s-lfb"></div>
+      <div>
+        <div class="source-name">London Fire Brigade</div>
+        <div class="source-desc" id="sd-lfb">Connecting...</div>
       </div>
     </div>
   </div>
@@ -805,6 +830,37 @@
 
   // ─── Load all ─────────────────────────────────────────
 
+  async function fetchTflRoads() {
+    try {
+      const r = await fetch(`${BASE}/api/tfl-roads`, FETCH_OPTS);
+      const { data } = await r.json();
+      const disruptions = data.disruptions || [];
+      setStatus('s-tflroads', 'sd-tflroads', 'ok', disruptions.length + ' road incidents');
+      return disruptions.map(d => ({ type: 'road', badge: 'TfL Road', title: d.description?.slice(0,100) || 'Road incident', meta: d.timeAgo || '', url: null, time: new Date(d.created) }));
+    } catch { setStatus('s-tflroads', 'sd-tflroads', 'err', 'Failed'); return []; }
+  }
+
+  async function fetchBluesky() {
+    try {
+      const r = await fetch(`${BASE}/api/bluesky`, FETCH_OPTS);
+      const { data } = await r.json();
+      const posts = data.posts || [];
+      if (data.error) { setStatus('s-bluesky', 'sd-bluesky', 'warn', data.error); }
+      else { setStatus('s-bluesky', 'sd-bluesky', 'ok', posts.length + ' posts'); }
+      return posts.map(p => ({ type: 'bluesky', badge: 'Bluesky', title: `@${p.author_username}: ${p.text?.slice(0,100)}`, meta: p.timeAgo || '', url: p.url, time: new Date(p.created_at) }));
+    } catch { setStatus('s-bluesky', 'sd-bluesky', 'err', 'Failed'); return []; }
+  }
+
+  async function fetchLfb() {
+    try {
+      const r = await fetch(`${BASE}/api/lfb`, FETCH_OPTS);
+      const { data } = await r.json();
+      const incidents = data.incidents || [];
+      setStatus('s-lfb', 'sd-lfb', 'ok', incidents.length + ' incidents');
+      return incidents.map(i => ({ type: 'lfb', badge: 'LFB', title: i.title || 'Fire incident', meta: i.timeAgo || '', url: i.url, time: new Date(i.date) }));
+    } catch { setStatus('s-lfb', 'sd-lfb', 'err', 'Failed'); return []; }
+  }
+
   async function fetchTwitter() {
     try {
       const r = await fetch(`${BASE}/api/twitter`, FETCH_OPTS);
@@ -824,10 +880,10 @@
 
   async function loadAll() {
     document.getElementById('m-time').textContent = new Date().toLocaleTimeString('en-GB', { hour:'2-digit', minute:'2-digit' });
-    const [policeItems, tflItems, floodItems, socialItems, newsItems, twitterItems] = await Promise.all([
-      fetchPolice(), fetchTfl(), fetchFlood(), fetchSocial(), fetchNews(), fetchTwitter()
+    const [policeItems, tflItems, floodItems, socialItems, newsItems, twitterItems, roadItems, blueskyItems, lfbItems] = await Promise.all([
+      fetchPolice(), fetchTfl(), fetchFlood(), fetchSocial(), fetchNews(), fetchTwitter(), fetchTflRoads(), fetchBluesky(), fetchLfb()
     ]);
-    buildFeed([...policeItems, ...tflItems, ...floodItems, ...socialItems, ...newsItems, ...twitterItems]);
+    buildFeed([...policeItems, ...tflItems, ...floodItems, ...socialItems, ...newsItems, ...twitterItems, ...roadItems, ...blueskyItems, ...lfbItems]);
   }
 
   // ─── Init ─────────────────────────────────────────────

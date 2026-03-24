@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Lewisham OSINT — Analytics</title>
+  <meta name="robots" content="noindex, nofollow" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0f1117; color: #e2e8f0; min-height: 100vh; }
+
+    .login-overlay { position: fixed; inset: 0; z-index: 9999; background: #0f1117; display: flex; align-items: center; justify-content: center; }
+    .login-overlay.hidden { display: none; }
+    .login-box { background: #1a1d2e; border: 1px solid #2d3148; border-radius: 12px; padding: 32px; width: 360px; max-width: 90vw; }
+    .login-box h2 { font-size: 18px; font-weight: 600; color: #fff; margin-bottom: 4px; }
+    .login-box p { font-size: 12px; color: #64748b; margin-bottom: 20px; }
+    .login-box label { display: block; font-size: 11px; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 5px; }
+    .login-box input { width: 100%; padding: 10px 12px; border: 1px solid #2d3148; border-radius: 6px; background: #0f1117; color: #e2e8f0; font-size: 14px; margin-bottom: 14px; outline: none; }
+    .login-box input:focus { border-color: #3b82f6; }
+    .login-btn { width: 100%; padding: 10px; border: none; border-radius: 6px; background: #3b82f6; color: #fff; font-size: 14px; font-weight: 600; cursor: pointer; }
+    .login-btn:hover { background: #2563eb; }
+    .login-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .login-error { font-size: 12px; color: #f87171; margin-top: 10px; text-align: center; display: none; }
+    .login-error.show { display: block; }
+
+    header { background: #1a1d2e; border-bottom: 1px solid #2d3148; padding: 14px 24px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 1000; }
+    header h1 { font-size: 18px; font-weight: 600; color: #fff; letter-spacing: -0.3px; }
+    header p { font-size: 12px; color: #64748b; margin-top: 2px; }
+    .header-actions { display: flex; gap: 8px; align-items: center; }
+    .nav-btn, .logout-btn { font-size: 11px; padding: 5px 12px; border: 1px solid #2d3148; border-radius: 6px; background: transparent; color: #64748b; cursor: pointer; text-decoration: none; }
+    .nav-btn:hover { color: #94a3b8; border-color: #3d4268; }
+    .logout-btn { border-color: #ef4444; color: #f87171; }
+    .logout-btn:hover { background: rgba(239,68,68,0.1); }
+
+    .container { max-width: 1400px; margin: 0 auto; padding: 20px 24px; }
+
+    .date-bar { display: flex; gap: 12px; margin-bottom: 20px; align-items: center; flex-wrap: wrap; }
+    .date-bar label { font-size: 11px; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; }
+    .date-input { padding: 7px 10px; border: 1px solid #2d3148; border-radius: 6px; background: #1a1d2e; color: #e2e8f0; font-size: 12px; outline: none; }
+    .date-input:focus { border-color: #3b82f6; }
+    .apply-btn { padding: 7px 14px; border: 1px solid #3b82f6; border-radius: 6px; background: transparent; color: #60a5fa; font-size: 12px; font-weight: 600; cursor: pointer; }
+    .apply-btn:hover { background: rgba(59,130,246,0.1); }
+
+    .stats-row { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-bottom: 20px; }
+    .stat-card { background: #1a1d2e; border: 1px solid #2d3148; border-radius: 10px; padding: 14px 16px; }
+    .stat-card .value { font-size: 28px; font-weight: 700; color: #fff; }
+    .stat-card .label { font-size: 10px; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; margin-top: 2px; }
+
+    .charts-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; margin-bottom: 20px; }
+    .chart-card { background: #1a1d2e; border: 1px solid #2d3148; border-radius: 10px; padding: 16px; }
+    .chart-card h3 { font-size: 12px; font-weight: 500; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 12px; }
+    .chart-card canvas { max-height: 300px; }
+    .chart-card.full { grid-column: span 2; }
+
+    @media (max-width: 900px) {
+      .stats-row { grid-template-columns: repeat(2, 1fr); }
+      .charts-grid { grid-template-columns: 1fr; }
+      .chart-card.full { grid-column: span 1; }
+    }
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+
+<div class="login-overlay" id="login-overlay">
+  <div class="login-box">
+    <h2>Admin Login</h2>
+    <p>Lewisham OSINT Analytics — authorised access only</p>
+    <form id="login-form">
+      <label for="password">Password</label>
+      <input type="password" id="password" placeholder="Enter admin password" required />
+      <label for="totp">Authenticator code</label>
+      <input type="text" id="totp" placeholder="6-digit code" maxlength="6" pattern="[0-9]{6}" inputmode="numeric" required />
+      <button type="submit" class="login-btn" id="login-btn">Sign in</button>
+      <div class="login-error" id="login-error">Invalid credentials.</div>
+    </form>
+  </div>
+</div>
+
+<header>
+  <div>
+    <h1>Analytics</h1>
+    <p>Crime intelligence statistics and trends</p>
+  </div>
+  <div class="header-actions">
+    <a href="/admin" class="nav-btn">Dashboard</a>
+    <a href="/admin/database" class="nav-btn">Database</a>
+    <button class="logout-btn" onclick="logout()">Logout</button>
+  </div>
+</header>
+
+<div class="container">
+
+  <div class="date-bar">
+    <label>From</label>
+    <input type="date" class="date-input" id="date-from" />
+    <label>To</label>
+    <input type="date" class="date-input" id="date-to" />
+    <button class="apply-btn" onclick="loadAnalytics()">Apply</button>
+  </div>
+
+  <div class="stats-row">
+    <div class="stat-card"><div class="value" id="s-crimes">—</div><div class="label">Police crimes</div></div>
+    <div class="stat-card"><div class="value" id="s-tweets">—</div><div class="label">Tweets</div></div>
+    <div class="stat-card"><div class="value" id="s-articles">—</div><div class="label">Articles</div></div>
+    <div class="stat-card"><div class="value" id="s-area">—</div><div class="label">Top area</div></div>
+    <div class="stat-card"><div class="value" id="s-type">—</div><div class="label">Top crime type</div></div>
+  </div>
+
+  <div class="charts-grid">
+    <div class="chart-card">
+      <h3>Crime by type</h3>
+      <canvas id="chart-types"></canvas>
+    </div>
+    <div class="chart-card">
+      <h3>Source breakdown</h3>
+      <canvas id="chart-sources"></canvas>
+    </div>
+    <div class="chart-card full">
+      <h3>Incidents over time</h3>
+      <canvas id="chart-timeline"></canvas>
+    </div>
+    <div class="chart-card">
+      <h3>Top areas</h3>
+      <canvas id="chart-areas"></canvas>
+    </div>
+    <div class="chart-card">
+      <h3>Crime outcomes</h3>
+      <canvas id="chart-outcomes"></canvas>
+    </div>
+  </div>
+
+</div>
+
+<script>
+
+const BASE = 'https://lewisham-osint-backend.onrender.com';
+const FETCH_OPTS = { credentials: 'include' };
+
+const CHART_COLORS = ['#ef4444','#3b82f6','#4ade80','#facc15','#c084fc','#f97316','#22d3ee','#f87171','#a78bfa','#34d399','#fbbf24','#fb7185'];
+const chartInstances = {};
+
+// ─── Auth ─────────────────────────────────────────────
+async function checkSession() {
+  try {
+    const r = await fetch(`${BASE}/api/auth/session`, FETCH_OPTS);
+    const data = await r.json();
+    if (data.authenticated) { document.getElementById('login-overlay').classList.add('hidden'); initDates(); loadAnalytics(); }
+  } catch {}
+}
+
+document.getElementById('login-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const btn = document.getElementById('login-btn'), errEl = document.getElementById('login-error');
+  btn.disabled = true; errEl.classList.remove('show');
+  try {
+    const r = await fetch(`${BASE}/api/auth/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
+      body: JSON.stringify({ password: document.getElementById('password').value, totp: document.getElementById('totp').value }) });
+    const data = await r.json();
+    if (data.success) { document.getElementById('login-overlay').classList.add('hidden'); initDates(); loadAnalytics(); }
+    else { errEl.textContent = data.error || 'Invalid credentials.'; errEl.classList.add('show'); }
+  } catch { errEl.textContent = 'Connection error.'; errEl.classList.add('show'); }
+  btn.disabled = false;
+});
+
+async function logout() {
+  try { await fetch(`${BASE}/api/auth/logout`, { method: 'POST', credentials: 'include' }); } catch {}
+  document.getElementById('login-overlay').classList.remove('hidden');
+}
+
+// ─── Dates ────────────────────────────────────────────
+function initDates() {
+  const now = new Date();
+  const threeMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 3, 1);
+  document.getElementById('date-from').value = threeMonthsAgo.toISOString().slice(0, 10);
+  document.getElementById('date-to').value = now.toISOString().slice(0, 10);
+}
+
+// ─── Load analytics ───────────────────────────────────
+async function loadAnalytics() {
+  const dateFrom = document.getElementById('date-from').value;
+  const dateTo = document.getElementById('date-to').value;
+  const params = new URLSearchParams();
+  if (dateFrom) params.set('dateFrom', dateFrom);
+  if (dateTo) params.set('dateTo', dateTo);
+
+  try {
+    const r = await fetch(`${BASE}/api/database/analytics?${params}`, FETCH_OPTS);
+    const json = await r.json();
+    if (!json.success) return;
+    const d = json.data;
+
+    // Stats
+    document.getElementById('s-crimes').textContent = (d.sourceBreakdown?.police || 0).toLocaleString();
+    document.getElementById('s-tweets').textContent = (d.sourceBreakdown?.twitter || 0).toLocaleString();
+    document.getElementById('s-articles').textContent = (d.sourceBreakdown?.news || 0).toLocaleString();
+    document.getElementById('s-area').textContent = d.topAreas?.[0]?.name || '—';
+    document.getElementById('s-type').textContent = (d.crimesByType?.[0]?.name || '—').replace(/-/g, ' ');
+
+    // Charts
+    renderBarChart('chart-types', d.crimesByType || [], 'Crime types');
+    renderDoughnutChart('chart-sources', d.sourceBreakdown || {});
+    renderLineChart('chart-timeline', d.crimesByMonth || []);
+    renderBarChart('chart-areas', (d.topAreas || []).slice(0, 10), 'Top areas');
+    renderBarChart('chart-outcomes', d.crimesByOutcome || [], 'Outcomes');
+  } catch {}
+}
+
+// ─── Chart renderers ──────────────────────────────────
+function destroyChart(id) {
+  if (chartInstances[id]) { chartInstances[id].destroy(); delete chartInstances[id]; }
+}
+
+function renderBarChart(canvasId, data, label) {
+  destroyChart(canvasId);
+  const ctx = document.getElementById(canvasId);
+  chartInstances[canvasId] = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: data.map(d => (d.name || '').replace(/-/g, ' ').slice(0, 25)),
+      datasets: [{
+        label: label,
+        data: data.map(d => d.count),
+        backgroundColor: data.map((_, i) => CHART_COLORS[i % CHART_COLORS.length] + '99'),
+        borderColor: data.map((_, i) => CHART_COLORS[i % CHART_COLORS.length]),
+        borderWidth: 1,
+      }]
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { color: '#64748b', font: { size: 10 } }, grid: { color: '#1e2235' } },
+        y: { ticks: { color: '#94a3b8', font: { size: 10 } }, grid: { display: false } },
+      }
+    }
+  });
+}
+
+function renderDoughnutChart(canvasId, breakdown) {
+  destroyChart(canvasId);
+  const labels = Object.keys(breakdown);
+  const values = Object.values(breakdown);
+  const ctx = document.getElementById(canvasId);
+  chartInstances[canvasId] = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels: labels.map(l => l.charAt(0).toUpperCase() + l.slice(1)),
+      datasets: [{
+        data: values,
+        backgroundColor: ['#ef4444', '#3b82f6', '#4ade80', '#c084fc', '#facc15'],
+        borderColor: '#1a1d2e',
+        borderWidth: 2,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'right', labels: { color: '#94a3b8', font: { size: 11 }, padding: 12 } }
+      }
+    }
+  });
+}
+
+function renderLineChart(canvasId, data) {
+  destroyChart(canvasId);
+  const ctx = document.getElementById(canvasId);
+  chartInstances[canvasId] = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: data.map(d => d.month),
+      datasets: [{
+        label: 'Crimes',
+        data: data.map(d => d.count),
+        borderColor: '#3b82f6',
+        backgroundColor: 'rgba(59,130,246,0.1)',
+        fill: true,
+        tension: 0.3,
+        pointRadius: 4,
+        pointBackgroundColor: '#3b82f6',
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { color: '#64748b', font: { size: 10 } }, grid: { color: '#1e2235' } },
+        y: { ticks: { color: '#64748b', font: { size: 10 } }, grid: { color: '#1e2235' }, beginAtZero: true },
+      }
+    }
+  });
+}
+
+window.addEventListener('load', checkSession);
+
+</script>
+</body>
+</html>

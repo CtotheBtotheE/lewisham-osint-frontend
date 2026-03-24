@@ -72,6 +72,12 @@
     .conf-low { background: rgba(239,68,68,0.15); color: #f87171; }
     .conf-none { color: #475569; }
 
+    .freshness { display: inline-block; width: 6px; height: 6px; border-radius: 50%; margin-right: 4px; vertical-align: middle; }
+    .fresh-live { background: #4ade80; }
+    .fresh-recent { background: #facc15; }
+    .fresh-stale { background: #475569; }
+    .ext-link { color: #60a5fa; text-decoration: none; font-size: 10px; margin-left: 6px; }
+    .ext-link:hover { text-decoration: underline; }
     .commit-cb { width: 16px; height: 16px; accent-color: #3b82f6; cursor: pointer; }
     .commit-cb:disabled { opacity: 0.4; cursor: not-allowed; }
 
@@ -186,6 +192,7 @@
   </div>
   <div class="header-actions">
     <a href="/admin" class="nav-btn">Dashboard</a>
+    <a href="/admin/analytics" class="nav-btn">Analytics</a>
     <button class="nav-btn" onclick="refreshAll()">Refresh</button>
     <button class="logout-btn" onclick="logout()">Logout</button>
   </div>
@@ -208,12 +215,15 @@
       <option value="police">Police</option>
       <option value="twitter">Twitter</option>
       <option value="news">News</option>
+      <option value="telegram">Telegram</option>
     </select>
     <select class="filter-select" id="filter-links">
       <option value="">All items</option>
       <option value="linked">Linked only</option>
       <option value="unlinked">Unlinked only</option>
     </select>
+    <input type="date" class="filter-select" id="filter-date-from" title="From date" />
+    <input type="date" class="filter-select" id="filter-date-to" title="To date" />
     <button class="action-btn primary" onclick="runCorrelation()">Run Correlation</button>
     <button class="action-btn" onclick="exportCsv()">Export CSV</button>
   </div>
@@ -304,10 +314,14 @@ async function loadFeed() {
   const search = document.getElementById('search').value;
   const source = document.getElementById('filter-source').value;
   const linkStatus = document.getElementById('filter-links').value;
+  const dateFrom = document.getElementById('filter-date-from').value;
+  const dateTo = document.getElementById('filter-date-to').value;
   const params = new URLSearchParams({ page: currentPage, limit: LIMIT, sort: currentSort, order: currentOrder });
   if (search) params.set('search', search);
   if (source) params.set('source', source);
   if (linkStatus) params.set('linkStatus', linkStatus);
+  if (dateFrom) params.set('dateFrom', dateFrom);
+  if (dateTo) params.set('dateTo', dateTo);
 
   try {
     const r = await fetch(`${BASE}/api/database/feed?${params}`, FETCH_OPTS);
@@ -332,7 +346,8 @@ function renderTable(items) {
     const isExpanded = expandedId === item.id && expandedSource === src;
 
     // Source badge
-    const srcBadge = `<span class="source-badge ${src}">${src === 'twitter' ? 'Twitter' : src === 'news' ? 'News' : 'Police'}</span>`;
+    const srcLabels = { police: 'Police', twitter: 'Twitter', news: 'News', telegram: 'Telegram', bluesky: 'Bluesky', road: 'TfL Road', lfb: 'LFB' };
+    const srcBadge = `<span class="source-badge ${src}">${srcLabels[src] || src}</span>`;
 
     // Description
     let desc = '';
@@ -343,13 +358,26 @@ function renderTable(items) {
     // Location
     const loc = escHtml(item.location || '—');
 
-    // Date
+    // Date + freshness
     let dateStr = '—';
+    let freshClass = 'fresh-stale';
     if (item.date) {
       try {
         const d = new Date(item.date);
-        dateStr = isNaN(d.getTime()) ? escHtml(item.date) : d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: '2-digit' });
+        if (!isNaN(d.getTime())) {
+          dateStr = d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: '2-digit' });
+          const ageMs = Date.now() - d.getTime();
+          if (ageMs < 86400000) freshClass = 'fresh-live';
+          else if (ageMs < 604800000) freshClass = 'fresh-recent';
+        } else { dateStr = escHtml(item.date); }
       } catch { dateStr = escHtml(item.date); }
+    }
+    const freshDot = `<span class="freshness ${freshClass}"></span>`;
+
+    // External URL for non-police items
+    let urlLink = '';
+    if (item.url && src !== 'police') {
+      urlLink = ` <a href="${escHtml(item.url)}" target="_blank" rel="noopener" class="ext-link" onclick="event.stopPropagation()">&#x2197;</a>`;
     }
 
     // Links
@@ -375,9 +403,9 @@ function renderTable(items) {
 
     html += `<tr class="expandable" onclick="toggleDetail('${id}', '${src}')">
       <td>${srcBadge}</td>
-      <td class="desc-cell">${desc}</td>
+      <td class="desc-cell">${desc}${urlLink}</td>
       <td style="text-transform:capitalize;">${loc}</td>
-      <td style="white-space:nowrap;">${dateStr}</td>
+      <td style="white-space:nowrap;">${freshDot}${dateStr}</td>
       <td><span class="${linkClass}">${linkCount}</span></td>
       <td>${confHtml}</td>
       <td>${commitHtml}</td>
@@ -606,6 +634,8 @@ async function exportCsv() {
 document.getElementById('search').addEventListener('input', () => { clearTimeout(searchTimeout); searchTimeout = setTimeout(() => { currentPage = 1; expandedId = null; loadFeed(); }, 300); });
 document.getElementById('filter-source').addEventListener('change', () => { currentPage = 1; expandedId = null; loadFeed(); });
 document.getElementById('filter-links').addEventListener('change', () => { currentPage = 1; expandedId = null; loadFeed(); });
+document.getElementById('filter-date-from').addEventListener('change', () => { currentPage = 1; expandedId = null; loadFeed(); });
+document.getElementById('filter-date-to').addEventListener('change', () => { currentPage = 1; expandedId = null; loadFeed(); });
 document.getElementById('modal-search').addEventListener('input', () => { clearTimeout(modalSearchTimeout); modalSearchTimeout = setTimeout(() => { modalPage = 1; loadModalResults(); }, 300); });
 document.getElementById('link-modal').addEventListener('click', (e) => { if (e.target === e.currentTarget) closeModal(); });
 
