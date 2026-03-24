@@ -4,13 +4,13 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Lewisham Live — Crime, Incidents & Local Events</title>
-    <meta name="description" content="Real-time crime map, traffic disruptions, flood alerts and local news for Lewisham, South East London. Live data updated every 5 minutes." />
-    <meta name="keywords" content="Lewisham crime, Lewisham incidents, Lewisham news, SE London safety" />
-    <meta property="og:title" content="Lewisham Live — Crime & Incidents Monitor" />
-    <meta property="og:description" content="Live crime map and incident feed for Lewisham, London." />
-    <meta property="og:url" content="https://lewishamwatch.co.uk" />
-    <meta name="robots" content="index, follow" />
-    <link rel="canonical" href="https://lewishamwatch.co.uk" />
+  <meta name="description" content="Real-time crime map, traffic disruptions, flood alerts and local news for Lewisham, South East London. Live data updated every 5 minutes." />
+  <meta name="keywords" content="Lewisham crime, Lewisham incidents, Lewisham news, SE London safety" />
+  <meta property="og:title" content="Lewisham Live — Crime & Incidents Monitor" />
+  <meta property="og:description" content="Live crime map and incident feed for Lewisham, London." />
+  <meta property="og:url" content="https://lewishamlive.co.uk" />
+  <meta name="robots" content="index, follow" />
+  <link rel="canonical" href="https://lewishamlive.co.uk" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -423,38 +423,31 @@
       maxZoom: 19
     }).addTo(map);
 
-function initMap() {
-  map = L.map('map', { zoomControl: true, attributionControl: false })
-          .setView([LEWISHAM.lat, LEWISHAM.lng], 13);
+    fetch('https://mapit.mysociety.org/area/2492.geojson?simplify_tolerance=0.001')
+      .then(r => r.json())
+      .then(geojson => {
+        L.geoJSON(geojson, {
+          style: {
+            color: '#3b82f6',
+            fillColor: '#3b82f6',
+            fillOpacity: 0.06,
+            weight: 2,
+          }
+        }).addTo(map).bindPopup('<b>London Borough of Lewisham</b>');
 
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-    maxZoom: 19
-  }).addTo(map);
+        map.fitBounds(
+          L.geoJSON(geojson).getBounds(),
+          { padding: [20, 20] }
+        );
+      })
+      .catch(() => {
+        L.circle([LEWISHAM.lat, LEWISHAM.lng], {
+          radius: 3000, color: '#3b82f6',
+          fillColor: '#3b82f6', fillOpacity: 0.05, weight: 1
+        }).addTo(map);
+      });
+  }
 
-  fetch('https://mapit.mysociety.org/area/2492.geojson?simplify_tolerance=0.001')
-    .then(r => r.json())
-    .then(geojson => {
-      L.geoJSON(geojson, {
-        style: {
-          color: '#3b82f6',
-          fillColor: '#3b82f6',
-          fillOpacity: 0.06,
-          weight: 2,
-        }
-      }).addTo(map).bindPopup('<b>London Borough of Lewisham</b>');
-
-      map.fitBounds(
-        L.geoJSON(geojson).getBounds(),
-        { padding: [20, 20] }
-      );
-    })
-    .catch(() => {
-      L.circle([LEWISHAM.lat, LEWISHAM.lng], {
-        radius: 3000, color: '#3b82f6',
-        fillColor: '#3b82f6', fillOpacity: 0.05, weight: 1
-      }).addTo(map);
-    });
-}
   async function fetchPolice() {
     try {
       const r = await fetch(`${BASE}/api/police`);
