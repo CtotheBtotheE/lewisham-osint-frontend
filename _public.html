@@ -91,6 +91,22 @@
     }
     .refresh-btn:hover { color: #94a3b8; border-color: #3d4268; }
 
+    .layer-toggles { display: flex; gap: 6px; }
+    .layer-btn {
+      font-size: 10px; padding: 4px 10px; border-radius: 6px; cursor: pointer;
+      font-weight: 600; border: 1px solid; transition: all 0.15s;
+    }
+    .layer-btn.crime { border-color: #ef4444; color: #f87171; background: rgba(239,68,68,0.15); }
+    .layer-btn.crime.off { background: transparent; opacity: 0.4; }
+    .layer-btn.live { border-color: #c084fc; color: #c084fc; background: rgba(192,132,252,0.15); }
+    .layer-btn.live.off { background: transparent; opacity: 0.4; }
+
+    .live-tooltip {
+      background: #1a1d2e; color: #c084fc; border: 1px solid #c084fc;
+      border-radius: 4px; font-size: 11px; font-weight: 600;
+      padding: 3px 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.5);
+    }
+
     @media (max-width: 900px) {
       .metrics { grid-template-columns: repeat(2, 1fr); }
     }
@@ -162,7 +178,13 @@
   <div class="card">
     <div class="card-header">
       <h2>Crime map — Lewisham borough</h2>
-      <span style="font-size:11px;color:#475569;" id="map-count"></span>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <div class="layer-toggles">
+          <button class="layer-btn crime" id="toggle-crime" onclick="toggleLayer('crime')">Historical Crime</button>
+          <button class="layer-btn live" id="toggle-live" onclick="toggleLayer('live')">Live Intel</button>
+        </div>
+        <span style="font-size:11px;color:#475569;" id="map-count"></span>
+      </div>
     </div>
     <div id="map"></div>
   </div>
@@ -175,7 +197,29 @@
   const BASE = 'https://lewisham-osint-backend.onrender.com';
   const LEWISHAM = { lat: 51.4613, lng: -0.0117 };
   let map;
-  let crimeLayer;
+  let crimeLayer, liveLayer;
+  let showCrime = true, showLive = true;
+
+  // Area name → approx coordinates for placing live intel dots
+  const AREA_COORDS = {
+    'lewisham': [51.4613, -0.0117], 'catford': [51.4530, -0.0220], 'brockley': [51.4740, -0.0260],
+    'downham': [51.4440, -0.0150], 'blackheath': [51.4680, 0.0020], 'forest hill': [51.4560, -0.0400],
+    'new cross': [51.4764, -0.0396], 'sydenham': [51.4275, -0.0536], 'hither green': [51.4720, -0.0050],
+    'deptford': [51.4830, -0.0100], 'grove park': [51.4380, 0.0230], 'lee': [51.4520, 0.0150],
+    'mottingham': [51.4340, 0.0380], 'lee green': [51.4480, 0.0060], 'bellingham': [51.4460, -0.0320],
+  };
+
+  function toggleLayer(layer) {
+    if (layer === 'crime') {
+      showCrime = !showCrime;
+      document.getElementById('toggle-crime').classList.toggle('off', !showCrime);
+      if (showCrime) map.addLayer(crimeLayer); else map.removeLayer(crimeLayer);
+    } else {
+      showLive = !showLive;
+      document.getElementById('toggle-live').classList.toggle('off', !showLive);
+      if (showLive) map.addLayer(liveLayer); else map.removeLayer(liveLayer);
+    }
+  }
 
   function initMap() {
     map = L.map('map', { zoomControl: true, attributionControl: false })
@@ -186,6 +230,7 @@
     }).addTo(map);
 
     crimeLayer = L.layerGroup().addTo(map);
+    liveLayer = L.layerGroup().addTo(map);
 
     fetch('https://mapit.mysociety.org/area/2492.geojson?simplify_tolerance=0.001')
       .then(r => r.json())
@@ -388,10 +433,101 @@
     }
   }
 
+  async function loadLiveIntel() {
+    liveLayer.clearLayers();
+    const LIVE_COLOR = '#c084fc';
+    let liveCount = 0;
+
+    // Fetch tweets, news, TfL road incidents in parallel
+    const [twitterRes, newsRes, roadsRes] = await Promise.allSettled([
+      fetch(`${BASE}/api/twitter`).then(r => r.json()),
+      fetch(`${BASE}/api/news`).then(r => r.json()),
+      fetch(`${BASE}/api/tfl-roads`).then(r => r.json()),
+    ]);
+
+    // Plot tweets with area_name
+    if (twitterRes.status === 'fulfilled' && twitterRes.value?.data?.tweets) {
+      twitterRes.value.data.tweets.forEach(t => {
+        const coords = t.lat && t.lng ? [t.lat, t.lng] : (t.area_name && AREA_COORDS[t.area_name]) ? AREA_COORDS[t.area_name] : null;
+        if (!coords) return;
+        const lat = coords[0] + (Math.random() - 0.5) * 0.002;
+        const lng = coords[1] + (Math.random() - 0.5) * 0.002;
+        const text = escHtml((t.text || '').slice(0, 150));
+        const url = escHtml(t.tweet_url || '#');
+        L.circleMarker([lat, lng], { radius: 5, fillColor: LIVE_COLOR, color: LIVE_COLOR, weight: 0.5, fillOpacity: 0.8 })
+          .bindTooltip('Tweet: @' + (t.author_username || ''), { direction: 'top', className: 'live-tooltip' })
+          .bindPopup(`<div style="width:260px;font-family:-apple-system,sans-serif;padding:12px;">
+            <div style="font-size:10px;color:#c084fc;font-weight:700;margin-bottom:4px;">LIVE — TWITTER</div>
+            <div style="font-size:10px;color:#64748b;"><a href="${url}" target="_blank" rel="noopener" style="color:#60a5fa;text-decoration:none;font-weight:600;">@${escHtml(t.author_username)}</a> &middot; ${relativeTime(t.created_at)}</div>
+            <div style="font-size:11px;color:#cbd5e1;margin-top:4px;line-height:1.4;">${text}</div>
+            ${t.media_urls?.[0] ? `<img src="${escHtml(t.media_urls[0])}" style="width:100%;border-radius:4px;margin-top:6px;max-height:100px;object-fit:cover;" onerror="this.style.display='none'" />` : ''}
+          </div>`, { maxWidth: 280 })
+          .addTo(liveLayer);
+        liveCount++;
+      });
+    }
+
+    // Plot news articles with area_name
+    if (newsRes.status === 'fulfilled' && newsRes.value?.data?.articles) {
+      newsRes.value.data.articles.forEach(a => {
+        if (!a.area_name || !AREA_COORDS[a.area_name]) return;
+        const coords = AREA_COORDS[a.area_name];
+        const lat = coords[0] + (Math.random() - 0.5) * 0.002;
+        const lng = coords[1] + (Math.random() - 0.5) * 0.002;
+        L.circleMarker([lat, lng], { radius: 4, fillColor: '#4ade80', color: '#4ade80', weight: 0.5, fillOpacity: 0.7 })
+          .bindTooltip('News', { direction: 'top', className: 'live-tooltip' })
+          .bindPopup(`<div style="width:260px;font-family:-apple-system,sans-serif;padding:12px;">
+            <div style="font-size:10px;color:#4ade80;font-weight:700;margin-bottom:4px;">LIVE — NEWS</div>
+            <a href="${escHtml(a.url || '#')}" target="_blank" rel="noopener" style="font-size:12px;color:#60a5fa;text-decoration:none;line-height:1.3;">${escHtml((a.title || '').slice(0, 120))}</a>
+            <div style="font-size:9px;color:#475569;margin-top:4px;">${escHtml(a.source || '')} &middot; ${relativeTime(a.published)}</div>
+          </div>`, { maxWidth: 280 })
+          .addTo(liveLayer);
+        liveCount++;
+      });
+    }
+
+    // Plot TfL road disruptions
+    if (roadsRes.status === 'fulfilled' && roadsRes.value?.data?.disruptions) {
+      roadsRes.value.data.disruptions.forEach(d => {
+        // Parse point field "[lng,lat]" or use area from description
+        let lat = null, lng = null;
+        if (d.point) {
+          try { const p = JSON.parse(d.point); lng = p[0]; lat = p[1]; } catch {}
+        }
+        if (!lat) {
+          // Try to find area from location text
+          const locLower = (d.location || d.description || '').toLowerCase();
+          for (const [area, c] of Object.entries(AREA_COORDS)) {
+            if (locLower.includes(area)) { lat = c[0]; lng = c[1]; break; }
+          }
+        }
+        if (!lat) return;
+        lat += (Math.random() - 0.5) * 0.001;
+        lng += (Math.random() - 0.5) * 0.001;
+        const sevColor = d.severity === 'Serious' ? '#ef4444' : d.severity === 'Moderate' ? '#facc15' : '#f97316';
+        L.circleMarker([lat, lng], { radius: 6, fillColor: sevColor, color: sevColor, weight: 1, fillOpacity: 0.8 })
+          .bindTooltip('Road: ' + (d.severity || ''), { direction: 'top', className: 'live-tooltip' })
+          .bindPopup(`<div style="width:260px;font-family:-apple-system,sans-serif;padding:12px;">
+            <div style="font-size:10px;color:${sevColor};font-weight:700;margin-bottom:4px;">LIVE — ROAD ${escHtml((d.severity || '').toUpperCase())}</div>
+            <div style="font-size:11px;color:#cbd5e1;line-height:1.4;">${escHtml((d.description || '').slice(0, 200))}</div>
+            <div style="font-size:9px;color:#475569;margin-top:4px;">${escHtml(d.category || '')} &middot; ${escHtml(d.location || '')}</div>
+          </div>`, { maxWidth: 280 })
+          .addTo(liveLayer);
+        liveCount++;
+      });
+    }
+
+    const countEl = document.getElementById('map-count');
+    const existing = countEl.textContent.split('|')[0].trim();
+    countEl.textContent = existing + (liveCount > 0 ? ` | ${liveCount} live intel` : '');
+  }
+
   window.addEventListener('load', () => {
     initMap();
     loadData();
+    loadLiveIntel();
     setInterval(loadData, 300000);
+    setInterval(loadLiveIntel, 300000);
   });
 
 </script>
