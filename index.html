@@ -463,77 +463,28 @@
       });
   }
 
-  // Query points spread across Lewisham borough for full coverage
-  const LEWISHAM_POINTS = [
-    { lat: 51.4613, lng: -0.0117 },  // Lewisham centre
-    { lat: 51.4530, lng: -0.0220 },  // Catford
-    { lat: 51.4740, lng: -0.0260 },  // Brockley
-    { lat: 51.4440, lng: -0.0150 },  // Downham
-    { lat: 51.4680, lng:  0.0020 },  // Blackheath / Lee
-    { lat: 51.4560, lng: -0.0400 },  // Forest Hill
-    { lat: 51.4810, lng: -0.0250 },  // New Cross
-    { lat: 51.4500, lng: -0.0500 },  // Sydenham
-    { lat: 51.4720, lng: -0.0050 },  // Hither Green
-    { lat: 51.4830, lng: -0.0100 },  // Deptford
-  ];
-
-  // Try fetching police data for a given YYYY-MM at a single point
-  async function tryPoliceMonth(lat, lng, dateStr) {
-    const url = `https://data.police.uk/api/crimes-street/all-crime?lat=${lat}&lng=${lng}&date=${dateStr}`;
-    const r = await fetch(url);
-    if (!r.ok) return null;
-    const data = await r.json();
-    return data.length ? data : null;
-  }
-
   async function fetchPolice() {
     try {
-      // Find most recent available month (API has ~2 month delay)
-      let usedMonth = '';
-      const now = new Date();
-      for (let i = 0; i < 5; i++) {
-        const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-        const ym = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
-        const test = await tryPoliceMonth(LEWISHAM.lat, LEWISHAM.lng, ym);
-        if (test) { usedMonth = ym; break; }
-      }
-      if (!usedMonth) throw new Error('No recent data');
+      const r = await fetch(`${BASE}/api/police`);
+      if (!r.ok) throw new Error('Backend unavailable');
+      const { data } = await r.json();
 
-      // Fetch crimes from all query points across the borough in parallel
-      const fetches = LEWISHAM_POINTS.map(p => tryPoliceMonth(p.lat, p.lng, usedMonth));
-      const results = await Promise.all(fetches);
-
-      // Deduplicate by persistent_id (or by lat+lng+category as fallback)
-      const seen = new Set();
-      const crimes = [];
-      results.forEach(arr => {
-        if (!arr) return;
-        arr.forEach(c => {
-          const key = c.persistent_id || `${c.location?.latitude},${c.location?.longitude},${c.category}`;
-          if (!seen.has(key)) {
-            seen.add(key);
-            crimes.push(c);
-          }
-        });
-      });
-
-      // Count categories
-      const typeCounts = {};
-      crimes.forEach(c => { typeCounts[c.category] = (typeCounts[c.category] || 0) + 1; });
-      const topCategory = Object.entries(typeCounts).sort((a, b) => b[1] - a[1])[0]?.[0] ?? 'unknown';
+      const crimes = data.incidents || [];
+      const usedMonth = data.month || 'recent';
+      const topCategory = (data.topCategory || 'unknown').replace(/-/g, ' ');
 
       document.getElementById('m-police').textContent = crimes.length.toLocaleString();
-      document.getElementById('m-crime-type').textContent = topCategory.replace(/-/g, ' ');
+      document.getElementById('m-crime-type').textContent = topCategory;
       setStatus('s-police', 'sd-police', 'ok', crimes.length + ' incidents loaded (' + usedMonth + ')');
 
       const CRIME_COLOR = '#ef4444'; // red
 
       crimes.forEach(c => {
-        const lat = parseFloat(c.location?.latitude ?? LEWISHAM.lat) + (Math.random() - 0.5) * 0.0005;
-        const lng = parseFloat(c.location?.longitude ?? LEWISHAM.lng) + (Math.random() - 0.5) * 0.0005;
+        const lat = c.lat + (Math.random() - 0.5) * 0.0005;
+        const lng = c.lng + (Math.random() - 0.5) * 0.0005;
         const category = (c.category || 'unknown').replace(/-/g, ' ');
-        const street = c.location?.street?.name ?? 'Lewisham';
-        const outcome = c.outcome_status?.category ?? 'Under investigation';
+        const street = c.street || 'Lewisham';
+        const outcome = c.outcome || 'Under investigation';
 
         L.circleMarker([lat, lng], {
           radius: 5, fillColor: CRIME_COLOR, color: CRIME_COLOR,
@@ -553,7 +504,7 @@
 
       return crimes.slice(0, 25).map(c => ({
         type:  'crime',
-        title: (c.category || '').replace(/-/g, ' ') + ' — ' + (c.location?.street?.name || 'Lewisham'),
+        title: (c.category || '').replace(/-/g, ' ') + ' — ' + (c.street || 'Lewisham'),
         meta:  'data.police.uk · ' + usedMonth,
         time:  Date.now() - Math.random() * 86400000 * 7
       }));
