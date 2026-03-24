@@ -209,7 +209,9 @@
   </div>
 
   <div class="controls">
-    <input type="text" class="search-input" id="search" placeholder="Search across all sources..." />
+    <input type="text" class="search-input" id="ai-search" placeholder="Ask AI: 'knife crimes near Catford last week'..." style="border-color:#c084fc;" />
+    <button class="action-btn" onclick="aiSearch()" style="border-color:#c084fc;color:#c084fc;">AI Search</button>
+    <input type="text" class="search-input" id="search" placeholder="Text search across all sources..." />
     <select class="filter-select" id="filter-source">
       <option value="">All sources</option>
       <option value="police">Police</option>
@@ -629,6 +631,37 @@ async function exportCsv() {
     URL.revokeObjectURL(url);
   } catch {}
 }
+
+// ─── AI Search ────────────────────────────────────────
+async function aiSearch() {
+  const query = document.getElementById('ai-search').value.trim();
+  if (!query) return;
+  const btn = document.querySelector('[onclick="aiSearch()"]');
+  btn.textContent = 'Thinking...'; btn.disabled = true;
+  try {
+    const r = await fetch(`${BASE}/api/ai/search`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ query }) });
+    const json = await r.json();
+    if (json.success && json.data) {
+      totalRecords = json.total || 0;
+      feedData = json.data || [];
+      renderTable(feedData);
+      renderPagination();
+      document.getElementById('empty-state').classList.toggle('hidden', feedData.length > 0);
+      document.getElementById('view-table').classList.toggle('hidden', feedData.length === 0);
+      // Show parsed filters
+      if (json.filters) {
+        const f = json.filters;
+        if (f.source) document.getElementById('filter-source').value = f.source;
+        if (f.dateFrom) document.getElementById('filter-date-from').value = f.dateFrom;
+        if (f.dateTo) document.getElementById('filter-date-to').value = f.dateTo;
+        if (f.linkStatus) document.getElementById('filter-links').value = f.linkStatus;
+      }
+    }
+  } catch {}
+  btn.textContent = 'AI Search'; btn.disabled = false;
+}
+
+document.getElementById('ai-search').addEventListener('keydown', (e) => { if (e.key === 'Enter') aiSearch(); });
 
 // ─── Event Listeners ──────────────────────────────────
 document.getElementById('search').addEventListener('input', () => { clearTimeout(searchTimeout); searchTimeout = setTimeout(() => { currentPage = 1; expandedId = null; loadFeed(); }, 300); });

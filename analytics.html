@@ -131,6 +131,26 @@
     </div>
   </div>
 
+  <!-- AI Intelligence Section -->
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;">
+    <div style="background:#1a1d2e;border:1px solid #2d3148;border-radius:10px;padding:16px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+        <h3 style="font-size:12px;font-weight:500;color:#c084fc;text-transform:uppercase;letter-spacing:0.05em;">AI Daily Briefing</h3>
+        <button onclick="loadBriefing()" style="padding:4px 10px;border:1px solid #c084fc;border-radius:4px;background:transparent;color:#c084fc;font-size:10px;cursor:pointer;">Generate</button>
+      </div>
+      <div id="briefing-content" style="font-size:12px;color:#cbd5e1;line-height:1.6;white-space:pre-wrap;max-height:400px;overflow-y:auto;">Click "Generate" to create an AI intelligence briefing</div>
+      <div id="briefing-time" style="font-size:9px;color:#475569;margin-top:8px;"></div>
+    </div>
+    <div style="background:#1a1d2e;border:1px solid #2d3148;border-radius:10px;padding:16px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+        <h3 style="font-size:12px;font-weight:500;color:#facc15;text-transform:uppercase;letter-spacing:0.05em;">AI Pattern Analysis</h3>
+        <button onclick="loadPatterns()" style="padding:4px 10px;border:1px solid #facc15;border-radius:4px;background:transparent;color:#facc15;font-size:10px;cursor:pointer;">Analyze</button>
+      </div>
+      <div id="patterns-content" style="font-size:12px;color:#cbd5e1;line-height:1.6;max-height:400px;overflow-y:auto;">Click "Analyze" to detect crime patterns and hotspots</div>
+      <div id="patterns-time" style="font-size:9px;color:#475569;margin-top:8px;"></div>
+    </div>
+  </div>
+
 </div>
 
 <script>
@@ -295,6 +315,68 @@ function renderLineChart(canvasId, data) {
     }
   });
 }
+
+// ─── AI Briefing ──────────────────────────────────────
+async function loadBriefing() {
+  const el = document.getElementById('briefing-content');
+  el.textContent = 'Generating intelligence briefing...';
+  try {
+    const r = await fetch(`${BASE}/api/ai/briefing`, FETCH_OPTS);
+    const json = await r.json();
+    if (json.success && json.data) {
+      el.textContent = json.data.briefing;
+      document.getElementById('briefing-time').textContent = 'Generated: ' + new Date(json.data.generatedAt).toLocaleString('en-GB');
+    } else {
+      el.textContent = json.data?.briefing || 'AI unavailable — add ANTHROPIC_API_KEY to Render env vars';
+    }
+  } catch { el.textContent = 'Failed to generate briefing'; }
+}
+
+// ─── AI Pattern Analysis ──────────────────────────────
+async function loadPatterns() {
+  const el = document.getElementById('patterns-content');
+  el.textContent = 'Analyzing crime patterns...';
+  try {
+    const dateFrom = document.getElementById('date-from').value;
+    const dateTo = document.getElementById('date-to').value;
+    const params = new URLSearchParams();
+    if (dateFrom) params.set('dateFrom', dateFrom);
+    if (dateTo) params.set('dateTo', dateTo);
+    const r = await fetch(`${BASE}/api/ai/patterns?${params}`, FETCH_OPTS);
+    const json = await r.json();
+    if (json.success && json.data) {
+      const d = json.data;
+      let html = '';
+      if (d.riskAssessment) html += `<div style="padding:8px 10px;border-left:3px solid #facc15;background:rgba(250,204,21,0.05);border-radius:0 4px 4px 0;margin-bottom:12px;"><strong>Risk Assessment:</strong> ${esc(d.riskAssessment)}</div>`;
+      if (d.hotspots && d.hotspots.length) {
+        html += '<div style="margin-bottom:10px;"><strong style="color:#ef4444;">Hotspots:</strong><ul style="margin:4px 0 0 16px;">';
+        d.hotspots.forEach(h => { html += `<li><strong>${esc(h.area)}</strong> (${esc(h.severity)}) — ${esc(h.detail)}</li>`; });
+        html += '</ul></div>';
+      }
+      if (d.trends && d.trends.length) {
+        html += '<div style="margin-bottom:10px;"><strong style="color:#3b82f6;">Trends:</strong><ul style="margin:4px 0 0 16px;">';
+        d.trends.forEach(t => { html += `<li><strong>${esc(t.category)}</strong> (${esc(t.type)}) — ${esc(t.detail)}</li>`; });
+        html += '</ul></div>';
+      }
+      if (d.anomalies && d.anomalies.length) {
+        html += '<div style="margin-bottom:10px;"><strong style="color:#c084fc;">Anomalies:</strong><ul style="margin:4px 0 0 16px;">';
+        d.anomalies.forEach(a => { html += `<li>${esc(a.detail)}</li>`; });
+        html += '</ul></div>';
+      }
+      if (d.recommendations && d.recommendations.length) {
+        html += '<div><strong style="color:#4ade80;">Recommendations:</strong><ul style="margin:4px 0 0 16px;">';
+        d.recommendations.forEach(r => { html += `<li>${esc(r)}</li>`; });
+        html += '</ul></div>';
+      }
+      el.innerHTML = html || 'No patterns detected';
+      document.getElementById('patterns-time').textContent = 'Analyzed: ' + new Date(d.analyzedAt).toLocaleString('en-GB');
+    } else {
+      el.textContent = 'AI unavailable — add ANTHROPIC_API_KEY to Render env vars';
+    }
+  } catch { el.textContent = 'Failed to analyze patterns'; }
+}
+
+function esc(s) { const d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML; }
 
 window.addEventListener('load', checkSession);
 
