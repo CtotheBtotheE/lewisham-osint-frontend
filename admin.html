@@ -293,7 +293,6 @@
     .badge-traffic { background: rgba(234,179,8,0.15);  color: #facc15; }
     .badge-social  { background: rgba(59,130,246,0.15); color: #60a5fa; }
     .badge-news    { background: rgba(34,197,94,0.15);  color: #4ade80; }
-    .badge-flood   { background: rgba(6,182,212,0.15);  color: #22d3ee; }
     .badge-air     { background: rgba(168,85,247,0.15); color: #c084fc; }
 
     .feed-content { flex: 1; min-width: 0; }
@@ -408,7 +407,7 @@
 <header>
   <div>
     <h1>Lewisham OSINT Monitor</h1>
-    <p>Live public data — Police · TfL · Flood · Air Quality · Reddit · News</p>
+    <p>Live public data — Police · TfL · Twitter · Reddit · News</p>
   </div>
   <div style="display:flex;gap:10px;align-items:center;">
     <div class="live-badge">
@@ -465,7 +464,6 @@
         <button class="filter-btn active" onclick="filterFeed('all',this)">All</button>
         <button class="filter-btn" onclick="filterFeed('crime',this)">Crime</button>
         <button class="filter-btn" onclick="filterFeed('traffic',this)">Traffic</button>
-        <button class="filter-btn" onclick="filterFeed('flood',this)">Flood</button>
         <button class="filter-btn" onclick="filterFeed('social',this)">Social</button>
         <button class="filter-btn" onclick="filterFeed('news',this)">News</button>
         <button class="filter-btn" onclick="filterFeed('twitter',this)">Twitter</button>
@@ -493,13 +491,6 @@
       <div>
         <div class="source-name">TfL Disruptions</div>
         <div class="source-desc" id="sd-tfl">Connecting...</div>
-      </div>
-    </div>
-    <div class="source-card">
-      <div class="status-dot dot-warn" id="s-flood"></div>
-      <div>
-        <div class="source-name">EA Flood Warnings</div>
-        <div class="source-desc" id="sd-flood">Connecting...</div>
       </div>
     </div>
     <div class="source-card">
@@ -733,30 +724,6 @@
     }
   }
 
-  async function fetchFlood() {
-    try {
-      const r = await fetch('https://environment.data.gov.uk/flood-monitoring/id/floods?min-severity=3&_limit=50', FETCH_OPTS);
-      if (!r.ok) throw new Error();
-      const data = await r.json();
-      const lewishamAreas = ['Ravensbourne', 'Deptford', 'Lewisham', 'Catford', 'Hither Green', 'Brockley', 'Sydenham'];
-      const items = (data.items || []).filter(f => {
-        const desc = (f.description || '') + (f.eaAreaName || '');
-        return lewishamAreas.some(a => desc.toLowerCase().includes(a.toLowerCase()));
-      });
-      const sevLabels = { 1:'Severe warning', 2:'Flood warning', 3:'Flood alert' };
-      setStatus('s-flood', 'sd-flood', items.length ? 'warn' : 'ok', items.length ? items.length + ' active alerts' : 'No active warnings');
-      return items.map(f => ({
-        type:  'flood',
-        title: (sevLabels[f.severityLevel] || 'Flood alert') + ' — ' + (f.description || f.eaAreaName || 'SE London'),
-        meta:  'Environment Agency · ' + (f.timeRaised ? timeAgo(f.timeRaised) : 'Active'),
-        time:  f.timeRaised ? new Date(f.timeRaised).getTime() : Date.now()
-      }));
-    } catch {
-      setStatus('s-flood', 'sd-flood', 'warn', 'Could not reach EA API');
-      return [];
-    }
-  }
-
   async function fetchSocial() {
     try {
       const r = await fetch(`${BASE}/api/reddit`, FETCH_OPTS);
@@ -810,7 +777,7 @@
       return;
     }
     list.innerHTML = items.slice(0, 40).map(item => {
-      const badge = { crime:'badge-crime', traffic:'badge-traffic', flood:'badge-flood', social:'badge-social', news:'badge-news', air:'badge-air' }[item.type] || 'badge-social';
+      const badge = { crime:'badge-crime', traffic:'badge-traffic', social:'badge-social', news:'badge-news', air:'badge-air' }[item.type] || 'badge-social';
       const click = item.url ? `onclick="window.open('${item.url}','_blank')" style="cursor:pointer;"` : '';
       return `<div class="feed-item" ${click}>
         <span class="feed-badge ${badge}">${item.type}</span>
@@ -880,10 +847,10 @@
 
   async function loadAll() {
     document.getElementById('m-time').textContent = new Date().toLocaleTimeString('en-GB', { hour:'2-digit', minute:'2-digit' });
-    const [policeItems, tflItems, floodItems, socialItems, newsItems, twitterItems, roadItems, blueskyItems, lfbItems] = await Promise.all([
-      fetchPolice(), fetchTfl(), fetchFlood(), fetchSocial(), fetchNews(), fetchTwitter(), fetchTflRoads(), fetchBluesky(), fetchLfb()
+    const [policeItems, tflItems, socialItems, newsItems, twitterItems, roadItems, blueskyItems, lfbItems] = await Promise.all([
+      fetchPolice(), fetchTfl(), fetchSocial(), fetchNews(), fetchTwitter(), fetchTflRoads(), fetchBluesky(), fetchLfb()
     ]);
-    buildFeed([...policeItems, ...tflItems, ...floodItems, ...socialItems, ...newsItems, ...twitterItems, ...roadItems, ...blueskyItems, ...lfbItems]);
+    buildFeed([...policeItems, ...tflItems, ...socialItems, ...newsItems, ...twitterItems, ...roadItems, ...blueskyItems, ...lfbItems]);
   }
 
   // ─── Init ─────────────────────────────────────────────
