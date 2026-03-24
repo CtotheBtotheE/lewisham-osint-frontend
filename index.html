@@ -423,11 +423,29 @@
       maxZoom: 19
     }).addTo(map);
 
+    fetch('https://mapit.mysociety.org/area/2492.geojson?simplify_tolerance=0.001')
+  .then(r => r.json())
+  .then(geojson => {
+    L.geoJSON(geojson, {
+      style: {
+        color: '#3b82f6',
+        fillColor: '#3b82f6',
+        fillOpacity: 0.06,
+        weight: 2,
+      }
+    }).addTo(map).bindPopup('<b>London Borough of Lewisham</b>');
+
+    map.fitBounds(
+      L.geoJSON(geojson).getBounds(),
+      { padding: [20, 20] }
+    );
+  })
+  .catch(() => {
     L.circle([LEWISHAM.lat, LEWISHAM.lng], {
       radius: 3000, color: '#3b82f6',
       fillColor: '#3b82f6', fillOpacity: 0.05, weight: 1
-    }).addTo(map).bindPopup('<b>Lewisham Borough</b><br>OSINT monitoring active');
-  }
+    }).addTo(map);
+  });
 
   async function fetchPolice() {
     try {
