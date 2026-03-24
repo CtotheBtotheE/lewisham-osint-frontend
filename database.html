@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Lewisham OSINT — Crime Database</title>
+  <meta name="robots" content="noindex, nofollow" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #0f1117;
+      color: #e2e8f0;
+      min-height: 100vh;
+    }
+
+    /* ─── Login overlay ──────────────────────────────────── */
+    .login-overlay {
+      position: fixed; inset: 0; z-index: 9999;
+      background: #0f1117;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .login-overlay.hidden { display: none; }
+    .login-box {
+      background: #1a1d2e; border: 1px solid #2d3148;
+      border-radius: 12px; padding: 32px; width: 360px; max-width: 90vw;
+    }
+    .login-box h2 { font-size: 18px; font-weight: 600; color: #fff; margin-bottom: 4px; }
+    .login-box p { font-size: 12px; color: #64748b; margin-bottom: 20px; }
+    .login-box label { display: block; font-size: 11px; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 5px; }
+    .login-box input {
+      width: 100%; padding: 10px 12px; border: 1px solid #2d3148; border-radius: 6px;
+      background: #0f1117; color: #e2e8f0; font-size: 14px; margin-bottom: 14px; outline: none;
+    }
+    .login-box input:focus { border-color: #3b82f6; }
+    .login-btn {
+      width: 100%; padding: 10px; border: none; border-radius: 6px;
+      background: #3b82f6; color: #fff; font-size: 14px; font-weight: 600; cursor: pointer;
+    }
+    .login-btn:hover { background: #2563eb; }
+    .login-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .login-error { font-size: 12px; color: #f87171; margin-top: 10px; text-align: center; display: none; }
+    .login-error.show { display: block; }
+
+    /* ─── Header ─────────────────────────────────────────── */
+    header {
+      background: #1a1d2e; border-bottom: 1px solid #2d3148;
+      padding: 14px 24px; display: flex; align-items: center; justify-content: space-between;
+      position: sticky; top: 0; z-index: 1000;
+    }
+    header h1 { font-size: 18px; font-weight: 600; color: #fff; letter-spacing: -0.3px; }
+    header p { font-size: 12px; color: #64748b; margin-top: 2px; }
+
+    .header-actions { display: flex; gap: 8px; align-items: center; }
+
+    .nav-btn, .logout-btn {
+      font-size: 11px; padding: 5px 12px; border: 1px solid #2d3148;
+      border-radius: 6px; background: transparent; color: #64748b; cursor: pointer; text-decoration: none;
+    }
+    .nav-btn:hover { color: #94a3b8; border-color: #3d4268; }
+    .logout-btn { border-color: #ef4444; color: #f87171; }
+    .logout-btn:hover { background: rgba(239,68,68,0.1); }
+
+    /* ─── Container ──────────────────────────────────────── */
+    .container { max-width: 1400px; margin: 0 auto; padding: 20px 24px; }
+
+    /* ─── Stats bar ──────────────────────────────────────── */
+    .stats-bar {
+      display: flex; gap: 12px; margin-bottom: 16px; flex-wrap: wrap;
+    }
+    .stat-chip {
+      background: #1a1d2e; border: 1px solid #2d3148; border-radius: 8px;
+      padding: 10px 16px; display: flex; flex-direction: column;
+    }
+    .stat-chip .stat-value { font-size: 22px; font-weight: 700; color: #fff; }
+    .stat-chip .stat-label { font-size: 10px; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; }
+
+    /* ─── Controls bar ───────────────────────────────────── */
+    .controls {
+      display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; align-items: center;
+    }
+    .search-input {
+      flex: 1; min-width: 200px; padding: 8px 12px; border: 1px solid #2d3148;
+      border-radius: 6px; background: #1a1d2e; color: #e2e8f0; font-size: 13px; outline: none;
+    }
+    .search-input:focus { border-color: #3b82f6; }
+    .search-input::placeholder { color: #475569; }
+
+    .filter-select {
+      padding: 8px 10px; border: 1px solid #2d3148; border-radius: 6px;
+      background: #1a1d2e; color: #e2e8f0; font-size: 12px; outline: none; cursor: pointer;
+    }
+
+    .view-toggle {
+      display: flex; border: 1px solid #2d3148; border-radius: 6px; overflow: hidden;
+    }
+    .view-toggle button {
+      padding: 7px 12px; border: none; background: transparent;
+      color: #64748b; font-size: 12px; cursor: pointer;
+    }
+    .view-toggle button.active { background: #2d3148; color: #e2e8f0; }
+    .view-toggle button:hover:not(.active) { color: #94a3b8; }
+
+    .export-btn {
+      padding: 7px 12px; border: 1px solid #2d3148; border-radius: 6px;
+      background: transparent; color: #64748b; font-size: 12px; cursor: pointer;
+    }
+    .export-btn:hover { color: #94a3b8; border-color: #3d4268; }
+
+    /* ─── Table view ─────────────────────────────────────── */
+    .table-wrap {
+      background: #1a1d2e; border: 1px solid #2d3148; border-radius: 10px; overflow: hidden;
+    }
+    table { width: 100%; border-collapse: collapse; }
+    thead th {
+      padding: 10px 14px; font-size: 11px; font-weight: 500; color: #64748b;
+      text-transform: uppercase; letter-spacing: 0.05em; text-align: left;
+      border-bottom: 1px solid #2d3148; cursor: pointer; user-select: none;
+      white-space: nowrap;
+    }
+    thead th:hover { color: #94a3b8; }
+    thead th.sorted { color: #3b82f6; }
+    tbody td {
+      padding: 10px 14px; font-size: 12px; color: #cbd5e1;
+      border-bottom: 1px solid #1e2235; text-transform: capitalize;
+    }
+    tbody tr:hover { background: #1e2235; }
+    tbody tr:last-child td { border-bottom: none; }
+
+    .category-badge {
+      display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 10px;
+      font-weight: 600; text-transform: capitalize;
+      background: rgba(239,68,68,0.15); color: #f87171;
+    }
+
+    /* ─── Card view ──────────────────────────────────────── */
+    .cards-grid {
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 12px;
+    }
+    .crime-card {
+      background: #1a1d2e; border: 1px solid #2d3148; border-radius: 10px;
+      padding: 14px 16px; transition: border-color 0.15s;
+    }
+    .crime-card:hover { border-color: #3d4268; }
+    .crime-card .card-cat {
+      font-size: 10px; font-weight: 600; text-transform: uppercase; color: #f87171;
+      margin-bottom: 6px; letter-spacing: 0.04em;
+    }
+    .crime-card .card-street { font-size: 14px; color: #e2e8f0; font-weight: 500; margin-bottom: 4px; text-transform: capitalize; }
+    .crime-card .card-meta { font-size: 11px; color: #475569; }
+    .crime-card .card-outcome { font-size: 11px; color: #94a3b8; margin-top: 6px; text-transform: capitalize; }
+
+    /* ─── Pagination ─────────────────────────────────────── */
+    .pagination {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-top: 16px; padding: 0 4px;
+    }
+    .pagination .page-info { font-size: 12px; color: #64748b; }
+    .pagination .page-btns { display: flex; gap: 6px; }
+    .page-btn {
+      padding: 6px 12px; border: 1px solid #2d3148; border-radius: 6px;
+      background: transparent; color: #64748b; font-size: 12px; cursor: pointer;
+    }
+    .page-btn:hover:not(:disabled) { color: #94a3b8; border-color: #3d4268; }
+    .page-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+
+    .hidden { display: none !important; }
+
+    .empty-state {
+      text-align: center; padding: 60px 20px; color: #475569; font-size: 14px;
+    }
+
+    @media (max-width: 768px) {
+      .controls { flex-direction: column; }
+      .search-input { min-width: unset; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- Login overlay -->
+<div class="login-overlay" id="login-overlay">
+  <div class="login-box">
+    <h2>Admin Login</h2>
+    <p>Lewisham OSINT Database — authorised access only</p>
+    <form id="login-form">
+      <label for="password">Password</label>
+      <input type="password" id="password" placeholder="Enter admin password" required />
+      <label for="totp">Authenticator code</label>
+      <input type="text" id="totp" placeholder="6-digit code" maxlength="6" pattern="[0-9]{6}" inputmode="numeric" required />
+      <button type="submit" class="login-btn" id="login-btn">Sign in</button>
+      <div class="login-error" id="login-error">Invalid credentials.</div>
+    </form>
+  </div>
+</div>
+
+<header>
+  <div>
+    <h1>Crime Database</h1>
+    <p>Persistent police crime records — search, filter & export</p>
+  </div>
+  <div class="header-actions">
+    <a href="/admin" class="nav-btn">Dashboard</a>
+    <button class="logout-btn" onclick="logout()">Logout</button>
+  </div>
+</header>
+
+<div class="container">
+
+  <!-- Stats -->
+  <div class="stats-bar" id="stats-bar">
+    <div class="stat-chip">
+      <span class="stat-value" id="stat-total">—</span>
+      <span class="stat-label">Total records</span>
+    </div>
+    <div class="stat-chip">
+      <span class="stat-value" id="stat-months">—</span>
+      <span class="stat-label">Months stored</span>
+    </div>
+    <div class="stat-chip">
+      <span class="stat-value" id="stat-top">—</span>
+      <span class="stat-label">Top crime type</span>
+    </div>
+  </div>
+
+  <!-- Controls -->
+  <div class="controls">
+    <input type="text" class="search-input" id="search" placeholder="Search by crime type, street or outcome..." />
+    <select class="filter-select" id="filter-category">
+      <option value="">All categories</option>
+    </select>
+    <select class="filter-select" id="filter-month">
+      <option value="">All months</option>
+    </select>
+    <div class="view-toggle">
+      <button class="active" id="btn-table" onclick="setView('table')">Table</button>
+      <button id="btn-cards" onclick="setView('cards')">Cards</button>
+    </div>
+    <button class="export-btn" onclick="exportCsv()">Export CSV</button>
+  </div>
+
+  <!-- Table view -->
+  <div class="table-wrap" id="view-table">
+    <table>
+      <thead>
+        <tr>
+          <th data-sort="category" onclick="sortBy('category')">Category</th>
+          <th data-sort="street" onclick="sortBy('street')">Street</th>
+          <th data-sort="outcome" onclick="sortBy('outcome')">Outcome</th>
+          <th data-sort="month" onclick="sortBy('month')">Month</th>
+        </tr>
+      </thead>
+      <tbody id="table-body"></tbody>
+    </table>
+  </div>
+
+  <!-- Card view -->
+  <div class="cards-grid hidden" id="view-cards"></div>
+
+  <!-- Empty state -->
+  <div class="empty-state hidden" id="empty-state">No crime records found. Try adjusting your search or filters.</div>
+
+  <!-- Pagination -->
+  <div class="pagination">
+    <span class="page-info" id="page-info"></span>
+    <div class="page-btns">
+      <button class="page-btn" id="btn-prev" onclick="changePage(-1)">Previous</button>
+      <button class="page-btn" id="btn-next" onclick="changePage(1)">Next</button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+
+const BASE = 'https://lewisham-osint-backend.onrender.com';
+const FETCH_OPTS = { credentials: 'include' };
+
+// State
+let currentView = 'table';
+let currentPage = 1;
+let currentSort = 'month';
+let currentOrder = 'DESC';
+let totalRecords = 0;
+const LIMIT = 50;
+let searchTimeout = null;
+
+// ─── Auth ─────────────────────────────────────────────
+
+async function checkSession() {
+  try {
+    const r = await fetch(`${BASE}/api/auth/session`, FETCH_OPTS);
+    const data = await r.json();
+    if (data.authenticated) {
+      document.getElementById('login-overlay').classList.add('hidden');
+      loadStats();
+      loadCrimes();
+    }
+  } catch {}
+}
+
+document.getElementById('login-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const btn = document.getElementById('login-btn');
+  const errEl = document.getElementById('login-error');
+  btn.disabled = true;
+  errEl.classList.remove('show');
+  try {
+    const r = await fetch(`${BASE}/api/auth/login`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ password: document.getElementById('password').value, totp: document.getElementById('totp').value }),
+    });
+    const data = await r.json();
+    if (data.success) {
+      document.getElementById('login-overlay').classList.add('hidden');
+      loadStats();
+      loadCrimes();
+    } else {
+      errEl.textContent = data.error || 'Invalid credentials.';
+      errEl.classList.add('show');
+    }
+  } catch {
+    errEl.textContent = 'Connection error.';
+    errEl.classList.add('show');
+  }
+  btn.disabled = false;
+});
+
+async function logout() {
+  try { await fetch(`${BASE}/api/auth/logout`, { method: 'POST', credentials: 'include' }); } catch {}
+  document.getElementById('login-overlay').classList.remove('hidden');
+}
+
+// ─── Stats ────────────────────────────────────────────
+
+async function loadStats() {
+  try {
+    const r = await fetch(`${BASE}/api/database/stats`, FETCH_OPTS);
+    const { data } = await r.json();
+
+    document.getElementById('stat-total').textContent = data.totalRecords.toLocaleString();
+    document.getElementById('stat-months').textContent = data.months.length;
+    document.getElementById('stat-top').textContent = data.categories[0]?.name.replace(/-/g, ' ') || '—';
+
+    // Populate filter dropdowns
+    const catSelect = document.getElementById('filter-category');
+    data.categories.forEach(c => {
+      const opt = document.createElement('option');
+      opt.value = c.name;
+      opt.textContent = c.name.replace(/-/g, ' ') + ` (${c.count})`;
+      catSelect.appendChild(opt);
+    });
+
+    const monthSelect = document.getElementById('filter-month');
+    data.months.forEach(m => {
+      const opt = document.createElement('option');
+      opt.value = m;
+      opt.textContent = m;
+      monthSelect.appendChild(opt);
+    });
+  } catch {}
+}
+
+// ─── Load crimes ──────────────────────────────────────
+
+async function loadCrimes() {
+  const search = document.getElementById('search').value;
+  const category = document.getElementById('filter-category').value;
+  const month = document.getElementById('filter-month').value;
+
+  const params = new URLSearchParams({
+    page: currentPage, limit: LIMIT,
+    sort: currentSort, order: currentOrder,
+  });
+  if (search) params.set('search', search);
+  if (category) params.set('category', category);
+  if (month) params.set('month', month);
+
+  try {
+    const r = await fetch(`${BASE}/api/database/crimes?${params}`, FETCH_OPTS);
+    const json = await r.json();
+    totalRecords = json.total || 0;
+    const crimes = json.data || [];
+
+    renderTable(crimes);
+    renderCards(crimes);
+    renderPagination();
+
+    const empty = document.getElementById('empty-state');
+    if (crimes.length === 0) {
+      empty.classList.remove('hidden');
+      document.getElementById('view-table').classList.add('hidden');
+      document.getElementById('view-cards').classList.add('hidden');
+    } else {
+      empty.classList.add('hidden');
+      setView(currentView);
+    }
+  } catch {}
+}
+
+// ─── Render table ─────────────────────────────────────
+
+function renderTable(crimes) {
+  const tbody = document.getElementById('table-body');
+  tbody.innerHTML = crimes.map(c => `
+    <tr>
+      <td><span class="category-badge">${(c.category || '').replace(/-/g, ' ')}</span></td>
+      <td>${c.street || '—'}</td>
+      <td>${(c.outcome || '—').replace(/-/g, ' ')}</td>
+      <td>${c.month || '—'}</td>
+    </tr>
+  `).join('');
+
+  // Update sort indicators
+  document.querySelectorAll('thead th').forEach(th => {
+    th.classList.toggle('sorted', th.dataset.sort === currentSort);
+    th.textContent = th.textContent.replace(/ [▲▼]/, '');
+    if (th.dataset.sort === currentSort) {
+      th.textContent += currentOrder === 'ASC' ? ' ▲' : ' ▼';
+    }
+  });
+}
+
+// ─── Render cards ─────────────────────────────────────
+
+function renderCards(crimes) {
+  document.getElementById('view-cards').innerHTML = crimes.map(c => `
+    <div class="crime-card">
+      <div class="card-cat">${(c.category || '').replace(/-/g, ' ')}</div>
+      <div class="card-street">${c.street || 'Unknown street'}</div>
+      <div class="card-meta">${c.month || '—'} · ${c.lat?.toFixed(4)}, ${c.lng?.toFixed(4)}</div>
+      <div class="card-outcome">${(c.outcome || 'Under investigation').replace(/-/g, ' ')}</div>
+    </div>
+  `).join('');
+}
+
+// ─── Pagination ───────────────────────────────────────
+
+function renderPagination() {
+  const totalPages = Math.ceil(totalRecords / LIMIT) || 1;
+  document.getElementById('page-info').textContent =
+    `Showing ${((currentPage - 1) * LIMIT) + 1}–${Math.min(currentPage * LIMIT, totalRecords)} of ${totalRecords.toLocaleString()} records`;
+  document.getElementById('btn-prev').disabled = currentPage <= 1;
+  document.getElementById('btn-next').disabled = currentPage >= totalPages;
+}
+
+function changePage(delta) {
+  currentPage = Math.max(1, currentPage + delta);
+  loadCrimes();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+// ─── Sort ─────────────────────────────────────────────
+
+function sortBy(col) {
+  if (currentSort === col) {
+    currentOrder = currentOrder === 'ASC' ? 'DESC' : 'ASC';
+  } else {
+    currentSort = col;
+    currentOrder = 'ASC';
+  }
+  currentPage = 1;
+  loadCrimes();
+}
+
+// ─── View toggle ──────────────────────────────────────
+
+function setView(view) {
+  currentView = view;
+  document.getElementById('view-table').classList.toggle('hidden', view !== 'table');
+  document.getElementById('view-cards').classList.toggle('hidden', view !== 'cards');
+  document.getElementById('btn-table').classList.toggle('active', view === 'table');
+  document.getElementById('btn-cards').classList.toggle('active', view === 'cards');
+}
+
+// ─── Export CSV ───────────────────────────────────────
+
+async function exportCsv() {
+  const search = document.getElementById('search').value;
+  const category = document.getElementById('filter-category').value;
+  const month = document.getElementById('filter-month').value;
+
+  const params = new URLSearchParams({ page: 1, limit: 10000, sort: currentSort, order: currentOrder });
+  if (search) params.set('search', search);
+  if (category) params.set('category', category);
+  if (month) params.set('month', month);
+
+  try {
+    const r = await fetch(`${BASE}/api/database/crimes?${params}`, FETCH_OPTS);
+    const json = await r.json();
+    const crimes = json.data || [];
+
+    const header = 'Category,Street,Outcome,Month,Latitude,Longitude\n';
+    const rows = crimes.map(c =>
+      `"${(c.category||'').replace(/-/g,' ')}","${c.street||''}","${(c.outcome||'').replace(/-/g,' ')}","${c.month||''}",${c.lat||''},${c.lng||''}`
+    ).join('\n');
+
+    const blob = new Blob([header + rows], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `lewisham-crimes-${new Date().toISOString().slice(0,10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  } catch {}
+}
+
+// ─── Event listeners ──────────────────────────────────
+
+document.getElementById('search').addEventListener('input', () => {
+  clearTimeout(searchTimeout);
+  searchTimeout = setTimeout(() => { currentPage = 1; loadCrimes(); }, 300);
+});
+
+document.getElementById('filter-category').addEventListener('change', () => { currentPage = 1; loadCrimes(); });
+document.getElementById('filter-month').addEventListener('change', () => { currentPage = 1; loadCrimes(); });
+
+// ─── Init ─────────────────────────────────────────────
+
+window.addEventListener('load', checkSession);
+
+</script>
+</body>
+</html>

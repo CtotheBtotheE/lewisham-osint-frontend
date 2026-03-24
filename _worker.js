@@ -14,6 +14,12 @@ export default {
       return env.ASSETS.fetch(new Request(url.toString(), request));
     }
 
+    // Serve database page at /admin/database
+    if (url.pathname === '/admin/database' || url.pathname === '/admin/database/') {
+      url.pathname = '/database.html';
+      return env.ASSETS.fetch(new Request(url.toString(), request));
+    }
+
     // Everything else: default static asset serving (index.html for /)
     return env.ASSETS.fetch(request);
   },
