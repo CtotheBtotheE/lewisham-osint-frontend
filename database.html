@@ -409,15 +409,16 @@ function toggleDetail(id, source) {
 }
 
 async function loadDetail(id, source) {
-  const panel = document.getElementById('detail-' + CSS.escape(id));
+  const panel = document.getElementById('detail-' + id);
   if (!panel) return;
 
   if (source === 'police') {
     try {
       const r = await fetch(`${BASE}/api/database/crimes/${encodeURIComponent(id)}/links`, FETCH_OPTS);
+      if (!r.ok) { panel.innerHTML = `<div class="no-links">Error ${r.status}: ${r.statusText}</div>`; return; }
       const json = await r.json();
       renderPoliceDetail(panel, id, json.data || { tweets: [], articles: [] });
-    } catch { panel.innerHTML = '<div class="no-links">Failed to load</div>'; }
+    } catch (err) { panel.innerHTML = `<div class="no-links">Failed to load: ${err.message}</div>`; }
   } else if (source === 'twitter') {
     panel.innerHTML = '<div class="no-links">Tweet detail — linked to crimes via the correlation engine. Use "Run Correlation" to update links.</div>';
   } else {
