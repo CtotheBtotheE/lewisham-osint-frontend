@@ -350,6 +350,7 @@
   </div>
   <div class="header-actions">
     <a href="/admin" class="nav-btn">Dashboard</a>
+    <button class="nav-btn" onclick="refreshAll()">Refresh</button>
     <button class="logout-btn" onclick="logout()">Logout</button>
   </div>
 </header>
@@ -944,6 +945,14 @@ document.getElementById('modal-search').addEventListener('input', () => {
 document.getElementById('link-modal').addEventListener('click', (e) => {
   if (e.target === e.currentTarget) closeModal();
 });
+
+// ─── Refresh all ──────────────────────────────────────
+
+function refreshAll() {
+  expandedCrimeId = null;
+  loadStats();
+  loadCrimes();
+}
 
 // ─── Init ─────────────────────────────────────────────
 
