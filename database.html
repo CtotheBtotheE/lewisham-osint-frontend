@@ -274,6 +274,7 @@
       <option value="linked">Linked only</option>
       <option value="unlinked">Unlinked only</option>
     </select>
+    <button class="action-btn" id="btn-24h" onclick="toggleLast24h()" style="border-color:#f59e0b;color:#f59e0b;">Last 24h</button>
     <input type="date" class="filter-select" id="filter-date-from" title="From date" />
     <input type="date" class="filter-select" id="filter-date-to" title="To date" />
     <button class="action-btn" onclick="exportCsv()">Export CSV</button>
@@ -819,6 +820,27 @@ async function exportCsv() {
     const a = document.createElement('a'); a.href = url; a.download = `lewisham-intel-${new Date().toISOString().slice(0,10)}.csv`; a.click();
     URL.revokeObjectURL(url);
   } catch {}
+}
+
+// ─── Last 24h Filter ─────────────────────────────────
+let is24hActive = false;
+function toggleLast24h() {
+  is24hActive = !is24hActive;
+  const btn = document.getElementById('btn-24h');
+  if (is24hActive) {
+    const now = new Date();
+    const yesterday = new Date(now.getTime() - 86400000);
+    document.getElementById('filter-date-from').value = yesterday.toISOString().slice(0, 10);
+    document.getElementById('filter-date-to').value = now.toISOString().slice(0, 10);
+    btn.style.background = 'rgba(245,158,11,0.2)';
+    btn.style.fontWeight = '700';
+  } else {
+    document.getElementById('filter-date-from').value = '';
+    document.getElementById('filter-date-to').value = '';
+    btn.style.background = '';
+    btn.style.fontWeight = '';
+  }
+  currentPage = 1; expandedId = null; loadFeed();
 }
 
 // ─── Event Listeners ──────────────────────────────────
