@@ -291,7 +291,7 @@
           <th>Time</th>
           <th data-sort="date" onclick="sortBy('date')">Date</th>
           <th data-sort="max_confidence" onclick="sortBy('max_confidence')">Confidence</th>
-          <th style="width:30px;"></th>
+          <th style="width:50px;">Dismiss</th>
           <th>Committed</th>
         </tr>
       </thead>
@@ -466,14 +466,9 @@ function renderTable(items) {
       confHtml = `<span class="conf-badge ${cls} clickable" onclick="event.stopPropagation(); openIntelModal('${id}', '${src}')">${pct}%</span>`;
     }
 
-    // Committed checkbox (only for police)
-    let commitHtml = '';
-    if (src === 'police') {
-      const checked = item.is_committed ? 'checked' : '';
-      commitHtml = `<input type="checkbox" class="commit-cb" ${checked} onclick="event.stopPropagation(); toggleCommit('${id}', this)" />`;
-    } else {
-      commitHtml = '<span style="color:#475569;font-size:10px;">—</span>';
-    }
+    // Committed checkbox (all rows)
+    const checked = item.is_committed ? 'checked' : '';
+    const commitHtml = `<input type="checkbox" class="commit-cb" ${checked} onclick="event.stopPropagation(); toggleCommit('${id}', '${src}', this)" />`;
 
     // Unique ID — short hash
     const shortId = (item.id || '').slice(0, 8).toUpperCase();
@@ -581,23 +576,25 @@ async function removeLink(pid, linkId) {
 }
 
 // ─── Commit/Uncommit ──────────────────────────────────
-async function toggleCommit(persistentId, cb) {
+async function toggleCommit(itemId, source, cb) {
   cb.disabled = true;
   const action = cb.checked ? 'commit' : 'uncommit';
   try {
-    const r = await fetch(`${BASE}/api/database/crimes/${encodeURIComponent(persistentId)}/${action}`, { method: 'POST', credentials: 'include' });
+    const r = await fetch(`${BASE}/api/database/crimes/${encodeURIComponent(itemId)}/${action}`, {
+      method: 'POST', credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ source })
+    });
     const json = await r.json();
     if (!json.success) { cb.checked = !cb.checked; }
     else {
-      // Update local data
-      const item = feedData.find(i => i.id === persistentId && i.source === 'police');
+      const item = feedData.find(i => i.id === itemId && i.source === source);
       if (item) {
         item.is_committed = cb.checked;
         if (json.summary) item.committed_summary = json.summary;
         else item.committed_summary = null;
       }
-      if (expandedId === persistentId) loadDetail(persistentId, 'police');
-      loadStats();
+      if (expandedId === itemId) loadDetail(itemId, source);
     }
   } catch { cb.checked = !cb.checked; }
   cb.disabled = false;
