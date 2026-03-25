@@ -488,7 +488,6 @@
         <button class="filter-btn" onclick="filterFeed('news',this)">News</button>
         <button class="filter-btn" onclick="filterFeed('twitter',this)">Twitter</button>
         <button class="filter-btn" onclick="filterFeed('road',this)">Roads</button>
-        <button class="filter-btn" onclick="filterFeed('bluesky',this)">Bluesky</button>
         <button class="filter-btn" onclick="filterFeed('lfb',this)">LFB</button>
       </div>
       <div class="feed-list" id="feed-list">
@@ -532,13 +531,6 @@
       <div>
         <div class="source-name">TfL Road Incidents</div>
         <div class="source-desc" id="sd-tflroads">Connecting...</div>
-      </div>
-    </div>
-    <div class="source-card">
-      <div class="status-dot dot-warn" id="s-bluesky"></div>
-      <div>
-        <div class="source-name">Bluesky</div>
-        <div class="source-desc" id="sd-bluesky">Connecting...</div>
       </div>
     </div>
     <div class="source-card">
@@ -855,16 +847,6 @@
     } catch { setStatus('s-tflroads', 'sd-tflroads', 'err', 'Failed'); return []; }
   }
 
-  async function fetchBluesky() {
-    try {
-      const r = await fetch(`${BASE}/api/bluesky`, FETCH_OPTS);
-      const { data } = await r.json();
-      const posts = data.posts || [];
-      if (data.error) { setStatus('s-bluesky', 'sd-bluesky', 'warn', data.error); }
-      else { setStatus('s-bluesky', 'sd-bluesky', 'ok', posts.length + ' posts'); }
-      return posts.map(p => ({ type: 'bluesky', badge: 'Bluesky', title: `@${p.author_username}: ${p.text?.slice(0,100)}`, meta: p.timeAgo || '', url: p.url, time: new Date(p.created_at) }));
-    } catch { setStatus('s-bluesky', 'sd-bluesky', 'err', 'Failed'); return []; }
-  }
 
   async function fetchLfb() {
     try {
@@ -958,10 +940,10 @@
 
   async function loadAll() {
     document.getElementById('m-time').textContent = new Date().toLocaleTimeString('en-GB', { hour:'2-digit', minute:'2-digit' });
-    const [policeItems, tflItems, socialItems, newsItems, twitterItems, roadItems, blueskyItems, lfbItems] = await Promise.all([
-      fetchPolice(), fetchTfl(), fetchSocial(), fetchNews(), fetchTwitter(), fetchTflRoads(), fetchBluesky(), fetchLfb()
+    const [policeItems, tflItems, socialItems, newsItems, twitterItems, roadItems, lfbItems] = await Promise.all([
+      fetchPolice(), fetchTfl(), fetchSocial(), fetchNews(), fetchTwitter(), fetchTflRoads(), fetchLfb()
     ]);
-    buildFeed([...policeItems, ...tflItems, ...socialItems, ...newsItems, ...twitterItems, ...roadItems, ...blueskyItems, ...lfbItems]);
+    buildFeed([...policeItems, ...tflItems, ...socialItems, ...newsItems, ...twitterItems, ...roadItems, ...lfbItems]);
   }
 
   // ─── Init ─────────────────────────────────────────────
