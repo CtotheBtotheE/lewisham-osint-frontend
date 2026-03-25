@@ -62,6 +62,12 @@
     .source-badge.police { background: rgba(239,68,68,0.15); color: #f87171; }
     .source-badge.twitter { background: rgba(59,130,246,0.15); color: #60a5fa; }
     .source-badge.news { background: rgba(74,222,128,0.15); color: #4ade80; }
+    .cat-badge { display: inline-block; padding: 2px 7px; border-radius: 4px; font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.03em; }
+    .cat-official { background: rgba(251,191,36,0.15); color: #fbbf24; }
+    .cat-social { background: rgba(192,132,252,0.15); color: #c084fc; }
+    .cat-news { background: rgba(74,222,128,0.15); color: #4ade80; }
+    .src-link { color: #64748b; text-decoration: none; font-size: 12px; margin-left: 4px; }
+    .src-link:hover { color: #3b82f6; }
 
     .link-count { display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 600; background: rgba(59,130,246,0.15); color: #60a5fa; }
     .link-count.zero { background: transparent; color: #475569; }
@@ -216,7 +222,6 @@
     </select>
     <input type="date" class="filter-select" id="filter-date-from" title="From date" />
     <input type="date" class="filter-select" id="filter-date-to" title="To date" />
-    <button class="action-btn primary" onclick="runCorrelation()">Run Correlation</button>
     <button class="action-btn" onclick="exportCsv()">Export CSV</button>
   </div>
 
@@ -224,13 +229,13 @@
     <table>
       <thead>
         <tr>
-          <th style="width:70px;">ID</th>
+          <th style="width:60px;">ID</th>
+          <th>Category</th>
           <th data-sort="source" onclick="sortBy('source')">Source</th>
           <th data-sort="title" onclick="sortBy('title')">Description</th>
           <th>Location</th>
-          <th data-sort="date" onclick="sortBy('date')">Date</th>
           <th>Time</th>
-          <th data-sort="link_count" onclick="sortBy('link_count')">Links</th>
+          <th data-sort="date" onclick="sortBy('date')">Date</th>
           <th data-sort="max_confidence" onclick="sortBy('max_confidence')">Confidence</th>
           <th>Committed</th>
         </tr>
@@ -329,26 +334,40 @@ function renderTable(items) {
     const src = item.source || 'police';
     const isExpanded = expandedId === item.id && expandedSource === src;
 
-    // Source badge — show specific source name
+    // Source — show exact website/platform
     let srcLabel = src;
-    if (src === 'police') srcLabel = 'Met Police';
-    else if (src === 'twitter') srcLabel = 'X / Twitter';
-    else if (src === 'telegram') srcLabel = 'Telegram';
-    else if (src === 'bluesky') srcLabel = 'Bluesky';
-    else if (src === 'road') srcLabel = 'TfL Roads';
-    else if (src === 'lfb') srcLabel = 'LFB';
+    let category = 'Other';
+    if (src === 'police') { srcLabel = 'Met Police'; category = 'Official'; }
+    else if (src === 'twitter') { srcLabel = 'X / Twitter'; category = 'Social Media'; }
+    else if (src === 'telegram') { srcLabel = 'Telegram'; category = 'Social Media'; }
+    else if (src === 'bluesky') { srcLabel = 'Bluesky'; category = 'Social Media'; }
+    else if (src === 'road') { srcLabel = 'TfL Roads'; category = 'Official'; }
+    else if (src === 'lfb') { srcLabel = 'London Fire Brigade'; category = 'Official'; }
     else if (src === 'news') {
-      const t = (item.title || '').toLowerCase();
       const u = (item.url || '').toLowerCase();
       if (u.includes('bbc.co.uk') || u.includes('bbc.com')) srcLabel = 'BBC News';
       else if (u.includes('mylondon') || u.includes('getwestlondon')) srcLabel = 'MyLondon';
       else if (u.includes('standard.co.uk')) srcLabel = 'Evening Standard';
-      else if (u.includes('news.met.police.uk')) srcLabel = 'Met Police News';
-      else if (u.includes('reddit.com')) srcLabel = 'Reddit';
-      else if (u.includes('google.com/alerts') || t.includes('google')) srcLabel = 'Google News';
-      else srcLabel = 'News';
+      else if (u.includes('news.met.police.uk')) { srcLabel = 'Met Police News'; category = 'Official'; }
+      else if (u.includes('reddit.com')) { srcLabel = 'Reddit'; category = 'Social Media'; }
+      else if (u.includes('google.com/alerts')) srcLabel = 'Google News';
+      else if (u.includes('itv.com')) srcLabel = 'ITV News';
+      else if (u.includes('theguardian.com')) srcLabel = 'The Guardian';
+      else if (u.includes('telegraph.co.uk')) srcLabel = 'The Telegraph';
+      else if (u.includes('independent.co.uk')) srcLabel = 'The Independent';
+      else if (u.includes('mirror.co.uk')) srcLabel = 'The Mirror';
+      else if (u.includes('sky.com') || u.includes('skynews')) srcLabel = 'Sky News';
+      else if (u.includes('lbc.co.uk')) srcLabel = 'LBC';
+      else if (u.includes('londonnewsonline')) srcLabel = 'London News Online';
+      else if (u.includes('newsshopper')) srcLabel = 'News Shopper';
+      else { try { srcLabel = new URL(item.url).hostname.replace('www.',''); } catch { srcLabel = 'News'; } }
+      if (category === 'Other') category = 'News';
     }
     const srcBadge = `<span class="source-badge ${src}">${srcLabel}</span>`;
+
+    // Category badge
+    const catColors = { 'Official': 'cat-official', 'Social Media': 'cat-social', 'News': 'cat-news' };
+    const catBadge = `<span class="cat-badge ${catColors[category] || ''}">${category}</span>`;
 
     // Description
     let desc = '';
@@ -378,15 +397,11 @@ function renderTable(items) {
     }
     const freshDot = `<span class="freshness ${freshClass}"></span>`;
 
-    // External URL for non-police items
-    let urlLink = '';
-    if (item.url && src !== 'police') {
-      urlLink = ` <a href="${escHtml(item.url)}" target="_blank" rel="noopener" class="ext-link" onclick="event.stopPropagation()">&#x2197;</a>`;
+    // Source link arrow
+    let srcArrow = '';
+    if (item.url) {
+      srcArrow = `<a href="${escHtml(item.url)}" target="_blank" rel="noopener" class="src-link" onclick="event.stopPropagation()" title="Open source">&#x2197;</a>`;
     }
-
-    // Links
-    const linkCount = item.link_count || 0;
-    const linkClass = linkCount > 0 ? 'link-count' : 'link-count zero';
 
     // Confidence
     let confHtml = '<span class="conf-none">—</span>';
@@ -410,12 +425,12 @@ function renderTable(items) {
 
     html += `<tr class="expandable" onclick="toggleDetail('${id}', '${src}')">
       <td style="font-family:monospace;font-size:10px;color:#64748b;">${shortId}</td>
-      <td>${srcBadge}</td>
-      <td class="desc-cell">${desc}${urlLink}</td>
+      <td>${catBadge}</td>
+      <td>${srcBadge}${srcArrow}</td>
+      <td class="desc-cell">${desc}</td>
       <td style="text-transform:capitalize;">${loc}</td>
-      <td style="white-space:nowrap;">${freshDot}${dateStr}</td>
       <td style="white-space:nowrap;font-size:11px;color:#94a3b8;">${timeStr}</td>
-      <td><span class="${linkClass}">${linkCount}</span></td>
+      <td style="white-space:nowrap;">${freshDot}${dateStr}</td>
       <td>${confHtml}</td>
       <td>${commitHtml}</td>
     </tr>`;
@@ -589,17 +604,6 @@ async function createLink(crimeId, type, linkedId, btn) {
     if (expandedId === crimeId) loadDetail(crimeId, 'police');
     loadStats();
   } catch { btn.textContent = 'Error'; btn.disabled = false; }
-}
-
-// ─── Correlation ──────────────────────────────────────
-async function runCorrelation() {
-  const btns = document.querySelectorAll('.action-btn.primary');
-  btns.forEach(b => { b.textContent = 'Running...'; b.disabled = true; });
-  try {
-    await fetch(`${BASE}/api/correlate`, { method: 'POST', credentials: 'include' });
-    loadStats(); loadFeed();
-    btns.forEach(b => { b.textContent = 'Done!'; setTimeout(() => { b.textContent = 'Run Correlation'; b.disabled = false; }, 2000); });
-  } catch { btns.forEach(b => { b.textContent = 'Failed'; setTimeout(() => { b.textContent = 'Run Correlation'; b.disabled = false; }, 2000); }); }
 }
 
 // ─── Pagination/Sort ──────────────────────────────────
