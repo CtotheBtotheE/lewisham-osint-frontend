@@ -37,8 +37,12 @@ export default {
       url.pathname = '/analytics.html';
       return env.ASSETS.fetch(new Request(url.toString(), request));
     }
+    if (path === '/demo' || path === '/demo/') {
+      url.pathname = '/demo.html';
+      return env.ASSETS.fetch(new Request(url.toString(), request));
+    }
 
-    // Maintenance mode — block all non-admin pages
+    // Maintenance mode — block all non-admin pages (demo is allowed above)
     if (MAINTENANCE && !path.startsWith('/admin')) {
       return new Response(MAINTENANCE_HTML, {
         status: 503,
