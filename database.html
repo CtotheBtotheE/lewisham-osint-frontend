@@ -621,17 +621,22 @@ function toggleCommit(itemId, source, cb) {
 
 function closeCommitModal() {
   document.getElementById('commit-modal').classList.remove('show');
-  if (commitCb) { commitCb.checked = false; } // Revert checkbox
+  if (commitCb) { commitCb.checked = false; } // Revert checkbox only on cancel
   commitItemId = null; commitSource = null; commitCb = null;
+}
+function hideCommitModal() {
+  document.getElementById('commit-modal').classList.remove('show');
+  // Don't revert checkbox — commit is proceeding
 }
 document.getElementById('commit-modal').addEventListener('click', (e) => { if (e.target === e.currentTarget) closeCommitModal(); });
 
 async function confirmCommit() {
   if (!commitItemId || !commitCb) return;
   const reason = document.getElementById('commit-reason').value.trim();
-  document.getElementById('commit-modal').classList.remove('show');
-  await doCommitAction(commitItemId, commitSource, 'commit', commitCb, reason);
+  const cb = commitCb, id = commitItemId, src = commitSource;
+  hideCommitModal();
   commitItemId = null; commitSource = null; commitCb = null;
+  await doCommitAction(id, src, 'commit', cb, reason);
 }
 
 async function doCommitAction(itemId, source, action, cb, reason) {
