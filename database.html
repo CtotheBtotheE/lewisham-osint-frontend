@@ -200,17 +200,7 @@
 
 <div class="container">
 
-  <div class="stats-bar">
-    <div class="stat-chip"><span class="stat-value" id="stat-total">—</span><span class="stat-label">Police records</span></div>
-    <div class="stat-chip"><span class="stat-value" id="stat-tweets">—</span><span class="stat-label">Tweets</span></div>
-    <div class="stat-chip"><span class="stat-value" id="stat-articles">—</span><span class="stat-label">Articles</span></div>
-    <div class="stat-chip"><span class="stat-value" id="stat-links">—</span><span class="stat-label">Intel links</span></div>
-    <div class="stat-chip"><span class="stat-value" id="stat-committed">—</span><span class="stat-label">Committed</span></div>
-  </div>
-
   <div class="controls">
-    <input type="text" class="search-input" id="ai-search" placeholder="Ask AI: 'knife crimes near Catford last week'..." style="border-color:#c084fc;" />
-    <button class="action-btn" onclick="aiSearch()" style="border-color:#c084fc;color:#c084fc;">AI Search</button>
     <input type="text" class="search-input" id="search" placeholder="Text search across all sources..." />
     <select class="filter-select" id="filter-source">
       <option value="">All sources</option>
@@ -234,10 +224,12 @@
     <table>
       <thead>
         <tr>
+          <th style="width:70px;">ID</th>
           <th data-sort="source" onclick="sortBy('source')">Source</th>
           <th data-sort="title" onclick="sortBy('title')">Description</th>
           <th>Location</th>
           <th data-sort="date" onclick="sortBy('date')">Date</th>
+          <th>Time</th>
           <th data-sort="link_count" onclick="sortBy('link_count')">Links</th>
           <th data-sort="max_confidence" onclick="sortBy('max_confidence')">Confidence</th>
           <th>Committed</th>
@@ -298,18 +290,8 @@ async function logout() {
   document.getElementById('login-overlay').classList.remove('hidden');
 }
 
-// ─── Stats ────────────────────────────────────────────
-async function loadStats() {
-  try {
-    const r = await fetch(`${BASE}/api/database/stats`, FETCH_OPTS);
-    const { data } = await r.json();
-    document.getElementById('stat-total').textContent = (data.totalRecords || 0).toLocaleString();
-    document.getElementById('stat-tweets').textContent = (data.totalTweets || 0).toLocaleString();
-    document.getElementById('stat-articles').textContent = (data.totalArticles || 0).toLocaleString();
-    document.getElementById('stat-links').textContent = (data.totalLinks || 0).toLocaleString();
-    document.getElementById('stat-committed').textContent = (data.totalCommitted || 0).toLocaleString();
-  } catch {}
-}
+// ─── Stats (moved to analytics page) ─────────────────
+async function loadStats() {}
 
 // ─── Unified Feed ─────────────────────────────────────
 async function loadFeed() {
@@ -347,9 +329,26 @@ function renderTable(items) {
     const src = item.source || 'police';
     const isExpanded = expandedId === item.id && expandedSource === src;
 
-    // Source badge
-    const srcLabels = { police: 'Police', twitter: 'Twitter', news: 'News', telegram: 'Telegram', bluesky: 'Bluesky', road: 'TfL Road', lfb: 'LFB' };
-    const srcBadge = `<span class="source-badge ${src}">${srcLabels[src] || src}</span>`;
+    // Source badge — show specific source name
+    let srcLabel = src;
+    if (src === 'police') srcLabel = 'Met Police';
+    else if (src === 'twitter') srcLabel = 'X / Twitter';
+    else if (src === 'telegram') srcLabel = 'Telegram';
+    else if (src === 'bluesky') srcLabel = 'Bluesky';
+    else if (src === 'road') srcLabel = 'TfL Roads';
+    else if (src === 'lfb') srcLabel = 'LFB';
+    else if (src === 'news') {
+      const t = (item.title || '').toLowerCase();
+      const u = (item.url || '').toLowerCase();
+      if (u.includes('bbc.co.uk') || u.includes('bbc.com')) srcLabel = 'BBC News';
+      else if (u.includes('mylondon') || u.includes('getwestlondon')) srcLabel = 'MyLondon';
+      else if (u.includes('standard.co.uk')) srcLabel = 'Evening Standard';
+      else if (u.includes('news.met.police.uk')) srcLabel = 'Met Police News';
+      else if (u.includes('reddit.com')) srcLabel = 'Reddit';
+      else if (u.includes('google.com/alerts') || t.includes('google')) srcLabel = 'Google News';
+      else srcLabel = 'News';
+    }
+    const srcBadge = `<span class="source-badge ${src}">${srcLabel}</span>`;
 
     // Description
     let desc = '';
@@ -360,14 +359,17 @@ function renderTable(items) {
     // Location
     const loc = escHtml(item.location || '—');
 
-    // Date + freshness
+    // Date + time + freshness
     let dateStr = '—';
+    let timeStr = '—';
     let freshClass = 'fresh-stale';
     if (item.date) {
       try {
         const d = new Date(item.date);
         if (!isNaN(d.getTime())) {
           dateStr = d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: '2-digit' });
+          timeStr = d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+          if (timeStr === '00:00') timeStr = '—';
           const ageMs = Date.now() - d.getTime();
           if (ageMs < 86400000) freshClass = 'fresh-live';
           else if (ageMs < 604800000) freshClass = 'fresh-recent';
@@ -403,18 +405,23 @@ function renderTable(items) {
       commitHtml = '<span style="color:#475569;font-size:10px;">—</span>';
     }
 
+    // Unique ID — short hash
+    const shortId = (item.id || '').slice(0, 8).toUpperCase();
+
     html += `<tr class="expandable" onclick="toggleDetail('${id}', '${src}')">
+      <td style="font-family:monospace;font-size:10px;color:#64748b;">${shortId}</td>
       <td>${srcBadge}</td>
       <td class="desc-cell">${desc}${urlLink}</td>
       <td style="text-transform:capitalize;">${loc}</td>
       <td style="white-space:nowrap;">${freshDot}${dateStr}</td>
+      <td style="white-space:nowrap;font-size:11px;color:#94a3b8;">${timeStr}</td>
       <td><span class="${linkClass}">${linkCount}</span></td>
       <td>${confHtml}</td>
       <td>${commitHtml}</td>
     </tr>`;
 
     if (isExpanded) {
-      html += `<tr class="detail-row"><td colspan="7"><div class="detail-panel" id="detail-${id}"><div class="modal-loading">Loading...</div></div></td></tr>`;
+      html += `<tr class="detail-row"><td colspan="9"><div class="detail-panel" id="detail-${id}"><div class="modal-loading">Loading...</div></div></td></tr>`;
     }
   });
 
@@ -631,37 +638,6 @@ async function exportCsv() {
     URL.revokeObjectURL(url);
   } catch {}
 }
-
-// ─── AI Search ────────────────────────────────────────
-async function aiSearch() {
-  const query = document.getElementById('ai-search').value.trim();
-  if (!query) return;
-  const btn = document.querySelector('[onclick="aiSearch()"]');
-  btn.textContent = 'Thinking...'; btn.disabled = true;
-  try {
-    const r = await fetch(`${BASE}/api/ai/search`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ query }) });
-    const json = await r.json();
-    if (json.success && json.data) {
-      totalRecords = json.total || 0;
-      feedData = json.data || [];
-      renderTable(feedData);
-      renderPagination();
-      document.getElementById('empty-state').classList.toggle('hidden', feedData.length > 0);
-      document.getElementById('view-table').classList.toggle('hidden', feedData.length === 0);
-      // Show parsed filters
-      if (json.filters) {
-        const f = json.filters;
-        if (f.source) document.getElementById('filter-source').value = f.source;
-        if (f.dateFrom) document.getElementById('filter-date-from').value = f.dateFrom;
-        if (f.dateTo) document.getElementById('filter-date-to').value = f.dateTo;
-        if (f.linkStatus) document.getElementById('filter-links').value = f.linkStatus;
-      }
-    }
-  } catch {}
-  btn.textContent = 'AI Search'; btn.disabled = false;
-}
-
-document.getElementById('ai-search').addEventListener('keydown', (e) => { if (e.key === 'Enter') aiSearch(); });
 
 // ─── Event Listeners ──────────────────────────────────
 document.getElementById('search').addEventListener('input', () => { clearTimeout(searchTimeout); searchTimeout = setTimeout(() => { currentPage = 1; expandedId = null; loadFeed(); }, 300); });
