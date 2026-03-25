@@ -82,6 +82,18 @@
     .intel-card-title a:hover { text-decoration: underline; }
     .intel-card-text { font-size: 11px; color: #94a3b8; line-height: 1.5; }
     .intel-card-meta { font-size: 10px; color: #475569; margin-top: 4px; }
+    .intel-card-actions { display: flex; gap: 6px; align-items: center; margin-top: 8px; padding-top: 8px; border-top: 1px solid #1e2235; }
+    .intel-action-btn { font-size: 10px; font-weight: 600; padding: 3px 10px; border-radius: 4px; cursor: pointer; border: 1px solid; transition: all 0.15s; }
+    .intel-action-btn.relevant { border-color: #4ade80; color: #4ade80; background: rgba(74,222,128,0.1); }
+    .intel-action-btn.relevant:hover { background: rgba(74,222,128,0.25); }
+    .intel-action-btn.not-relevant { border-color: #ef4444; color: #f87171; background: rgba(239,68,68,0.1); }
+    .intel-action-btn.not-relevant:hover { background: rgba(239,68,68,0.25); }
+    .intel-action-btn.actioned { opacity: 0.5; pointer-events: none; }
+    .intel-reason-input { margin-top: 6px; width: 100%; padding: 5px 8px; border: 1px solid #2d3148; border-radius: 4px; background: #0a0c14; color: #e2e8f0; font-size: 10px; outline: none; display: none; }
+    .intel-reason-input:focus { border-color: #3b82f6; }
+    .intel-card-verdict { margin-top: 6px; font-size: 10px; font-weight: 600; padding: 3px 8px; border-radius: 4px; display: inline-block; }
+    .intel-card-verdict.is-relevant { color: #4ade80; background: rgba(74,222,128,0.1); }
+    .intel-card-verdict.is-not-relevant { color: #f87171; background: rgba(239,68,68,0.1); }
     .intel-no-ai { background: rgba(251,191,36,0.1); border: 1px solid rgba(251,191,36,0.3); border-radius: 8px; padding: 12px 16px; margin-bottom: 16px; font-size: 12px; color: #fbbf24; }
     .intel-section-title { font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; margin: 12px 0 8px; }
     .dismiss-btn { background: none; border: none; color: #475569; font-size: 14px; cursor: pointer; padding: 2px 6px; border-radius: 3px; line-height: 1; }
@@ -747,6 +759,50 @@ async function confirmDismiss() {
 
 // ─── Intel Modal ──────────────────────────────────────
 function closeIntelModal() { document.getElementById('intel-modal').classList.remove('show'); }
+
+// Intel card verdict tracking
+let pendingVerdicts = {};
+
+function intelCardVerdict(cardId, itemId, source, verdict) {
+  pendingVerdicts[cardId] = { itemId, source, verdict };
+  const actionsEl = document.getElementById(cardId + '-actions');
+  const reasonEl = document.getElementById(cardId + '-reason');
+
+  // Highlight the chosen button, dim the other
+  actionsEl.querySelectorAll('.intel-action-btn').forEach(btn => {
+    btn.classList.add('actioned');
+  });
+
+  // Show reason input
+  reasonEl.style.display = 'block';
+  reasonEl.placeholder = verdict === 'relevant'
+    ? 'Why is this relevant? (optional, press Enter to confirm)'
+    : 'Why not relevant? (e.g. duplicate, wrong area... press Enter to confirm)';
+  reasonEl.focus();
+}
+
+async function submitIntelVerdict(cardId, itemId, source) {
+  const v = pendingVerdicts[cardId];
+  if (!v) return;
+  const reasonEl = document.getElementById(cardId + '-reason');
+  const reason = reasonEl.value.trim();
+
+  // Save to backend for learning
+  try {
+    await fetch(`${BASE}/api/database/intel-verdict`, {
+      method: 'POST', credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ itemId: v.itemId, source: v.source, verdict: v.verdict, reason })
+    });
+  } catch {}
+
+  // Replace actions with verdict badge
+  const actionsEl = document.getElementById(cardId + '-actions');
+  const isRelevant = v.verdict === 'relevant';
+  actionsEl.innerHTML = `<span class="intel-card-verdict ${isRelevant ? 'is-relevant' : 'is-not-relevant'}">${isRelevant ? '✓ Relevant' : '✗ Not Relevant'}${reason ? ' — ' + escHtml(reason) : ''}</span>`;
+  reasonEl.style.display = 'none';
+  delete pendingVerdicts[cardId];
+}
 document.getElementById('intel-modal').addEventListener('click', (e) => { if (e.target === e.currentTarget) closeIntelModal(); });
 
 async function openIntelModal(itemId, source) {
@@ -836,13 +892,19 @@ function renderIntelCard(item) {
 
   const titleLink = item.url ? `<a href="${escHtml(item.url)}" target="_blank" rel="noopener">${escHtml((item.title || '').slice(0, 120))}</a>` : escHtml((item.title || '').slice(0, 120));
 
-  return `<div class="intel-source-card">
+  const cardId = `intel-card-${src}-${(item.id||'').toString().replace(/[^a-zA-Z0-9]/g,'')}`;
+  return `<div class="intel-source-card" id="${cardId}">
     <div class="intel-card-header">
       <span class="intel-card-source" style="color:${catColor}">${escHtml(srcLabel)} · ${cat}</span>
       <span class="intel-card-date">${dateStr}</span>
     </div>
     <div class="intel-card-title">${titleLink}</div>
     <div class="intel-card-meta">${escHtml(item.location || '—')}</div>
+    <div class="intel-card-actions" id="${cardId}-actions">
+      <button class="intel-action-btn relevant" onclick="intelCardVerdict('${cardId}','${escHtml(item.id)}','${src}','relevant')">Relevant</button>
+      <button class="intel-action-btn not-relevant" onclick="intelCardVerdict('${cardId}','${escHtml(item.id)}','${src}','not-relevant')">Not Relevant</button>
+    </div>
+    <input type="text" class="intel-reason-input" id="${cardId}-reason" placeholder="Why? (e.g. duplicate, wrong area, unrelated...)" onkeydown="if(event.key==='Enter')submitIntelVerdict('${cardId}','${escHtml(item.id)}','${src}')" />
   </div>`;
 }
 
