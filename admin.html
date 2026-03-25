@@ -704,31 +704,31 @@
 
       const CRIME_COLOR = '#ef4444';
 
-      crimes.forEach(c => {
-        const lat = c.lat + (Math.random() - 0.5) * 0.0005;
-        const lng = c.lng + (Math.random() - 0.5) * 0.0005;
-        const category = (c.category || 'unknown').replace(/-/g, ' ');
-        const street = c.street || 'Lewisham';
-        const outcome = c.outcome || 'Under investigation';
+      // Dots disabled — re-enable when ready
+      // crimes.forEach(c => {
+      //   const lat = c.lat + (Math.random() - 0.5) * 0.0005;
+      //   const lng = c.lng + (Math.random() - 0.5) * 0.0005;
+      //   const category = (c.category || 'unknown').replace(/-/g, ' ');
+      //   const street = c.street || 'Lewisham';
+      //   const outcome = c.outcome || 'Under investigation';
+      //   L.circleMarker([lat, lng], {
+      //     radius: 5, fillColor: CRIME_COLOR, color: CRIME_COLOR,
+      //     weight: 0.5, fillOpacity: 0.75
+      //   })
+      //   .bindTooltip(category, { direction: 'top', className: 'crime-tooltip' })
+      //   .bindPopup(
+      //     `<b style="text-transform:capitalize">${category}</b><br>` +
+      //     `${street}<br>` +
+      //     `<small>${outcome}</small><br>` +
+      //     `<small>${usedMonth}</small>`
+      //   )
+      //   .addTo(crimeLayer);
+      // });
 
-        L.circleMarker([lat, lng], {
-          radius: 5, fillColor: CRIME_COLOR, color: CRIME_COLOR,
-          weight: 0.5, fillOpacity: 0.75
-        })
-        .bindTooltip(category, { direction: 'top', className: 'crime-tooltip' })
-        .bindPopup(
-          `<b style="text-transform:capitalize">${category}</b><br>` +
-          `${street}<br>` +
-          `<small>${outcome}</small><br>` +
-          `<small>${usedMonth}</small>`
-        )
-        .addTo(crimeLayer);
-      });
+      document.getElementById('map-count').textContent = crimes.length + ' incidents (' + usedMonth + ') — dots hidden';
 
-      document.getElementById('map-count').textContent = crimes.length + ' incidents (' + usedMonth + ')';
-
-      // Load live intel on the map
-      loadLiveMapIntel();
+      // Live intel disabled — re-enable when ready
+      // loadLiveMapIntel();
 
       return crimes.slice(0, 25).map(c => ({
         type:  'crime',
