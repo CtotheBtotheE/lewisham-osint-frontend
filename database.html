@@ -68,6 +68,31 @@
     .cat-news { background: rgba(74,222,128,0.15); color: #4ade80; }
     .src-link { color: #64748b; text-decoration: none; font-size: 12px; margin-left: 4px; }
     .src-link:hover { color: #3b82f6; }
+    .conf-badge.clickable { cursor: pointer; }
+    .conf-badge.clickable:hover { filter: brightness(1.3); }
+    .intel-summary { background: linear-gradient(135deg, rgba(59,130,246,0.1), rgba(192,132,252,0.1)); border: 1px solid rgba(59,130,246,0.3); border-radius: 8px; padding: 14px 16px; margin-bottom: 16px; font-size: 13px; line-height: 1.6; color: #e2e8f0; }
+    .intel-summary-label { font-size: 10px; font-weight: 700; color: #3b82f6; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px; }
+    .intel-source-card { background: #0f1117; border: 1px solid #2d3148; border-radius: 8px; padding: 12px 14px; margin-bottom: 8px; }
+    .intel-source-card:hover { border-color: #3b82f6; }
+    .intel-card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+    .intel-card-source { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; }
+    .intel-card-date { font-size: 10px; color: #64748b; }
+    .intel-card-title { font-size: 12px; color: #e2e8f0; font-weight: 500; margin-bottom: 4px; }
+    .intel-card-title a { color: #60a5fa; text-decoration: none; }
+    .intel-card-title a:hover { text-decoration: underline; }
+    .intel-card-text { font-size: 11px; color: #94a3b8; line-height: 1.5; }
+    .intel-card-meta { font-size: 10px; color: #475569; margin-top: 4px; }
+    .intel-no-ai { background: rgba(251,191,36,0.1); border: 1px solid rgba(251,191,36,0.3); border-radius: 8px; padding: 12px 16px; margin-bottom: 16px; font-size: 12px; color: #fbbf24; }
+    .intel-section-title { font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; margin: 12px 0 8px; }
+    .dismiss-btn { background: none; border: none; color: #475569; font-size: 14px; cursor: pointer; padding: 2px 6px; border-radius: 3px; line-height: 1; }
+    .dismiss-btn:hover { color: #ef4444; background: rgba(239,68,68,0.15); }
+    .dismiss-textarea { width: 100%; padding: 10px; background: #0f1117; border: 1px solid #2d3148; border-radius: 6px; color: #e2e8f0; font-size: 13px; resize: vertical; min-height: 80px; margin: 10px 0; }
+    .dismiss-textarea:focus { border-color: #ef4444; outline: none; }
+    .dismiss-confirm-btn { padding: 8px 18px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; border: none; }
+    .dismiss-confirm-btn.red { background: #ef4444; color: #fff; }
+    .dismiss-confirm-btn.red:hover { background: #dc2626; }
+    .dismiss-confirm-btn.cancel { background: transparent; color: #64748b; border: 1px solid #2d3148; }
+    .dismiss-confirm-btn.cancel:hover { color: #e2e8f0; }
 
     .link-count { display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 600; background: rgba(59,130,246,0.15); color: #60a5fa; }
     .link-count.zero { background: transparent; color: #475569; }
@@ -191,6 +216,35 @@
   </div>
 </div>
 
+<div class="modal-overlay" id="dismiss-modal">
+  <div class="modal" style="width:420px;">
+    <div class="modal-header">
+      <h3>Dismiss Item</h3>
+      <button class="modal-close" onclick="closeDismissModal()">&times;</button>
+    </div>
+    <div style="padding:16px 20px;">
+      <p style="font-size:12px;color:#94a3b8;margin-bottom:4px;">Why are you dismissing this item?</p>
+      <textarea class="dismiss-textarea" id="dismiss-reason" placeholder="e.g. Duplicate, not relevant, incorrect data..."></textarea>
+      <div style="display:flex;gap:8px;justify-content:flex-end;">
+        <button class="dismiss-confirm-btn cancel" onclick="closeDismissModal()">Cancel</button>
+        <button class="dismiss-confirm-btn red" onclick="confirmDismiss()">Dismiss</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="intel-modal">
+  <div class="modal" style="width:680px;">
+    <div class="modal-header">
+      <h3 id="intel-modal-title">Intelligence Report</h3>
+      <button class="modal-close" onclick="closeIntelModal()">&times;</button>
+    </div>
+    <div style="padding:16px 20px;overflow-y:auto;max-height:70vh;" id="intel-modal-body">
+      <div class="modal-loading">Analysing corroborating sources...</div>
+    </div>
+  </div>
+</div>
+
 <header>
   <div>
     <h1>Intelligence Database</h1>
@@ -237,6 +291,7 @@
           <th>Time</th>
           <th data-sort="date" onclick="sortBy('date')">Date</th>
           <th data-sort="max_confidence" onclick="sortBy('max_confidence')">Confidence</th>
+          <th style="width:30px;"></th>
           <th>Committed</th>
         </tr>
       </thead>
@@ -403,12 +458,12 @@ function renderTable(items) {
       srcArrow = `<a href="${escHtml(item.url)}" target="_blank" rel="noopener" class="src-link" onclick="event.stopPropagation()" title="Open source">&#x2197;</a>`;
     }
 
-    // Confidence
+    // Confidence — clickable to open intel popup
     let confHtml = '<span class="conf-none">—</span>';
     if (item.max_confidence > 0) {
       const pct = Math.round(item.max_confidence * 100);
       const cls = pct >= 70 ? 'conf-high' : pct >= 40 ? 'conf-med' : 'conf-low';
-      confHtml = `<span class="conf-badge ${cls}">${pct}%</span>`;
+      confHtml = `<span class="conf-badge ${cls} clickable" onclick="event.stopPropagation(); openIntelModal('${id}', '${src}')">${pct}%</span>`;
     }
 
     // Committed checkbox (only for police)
@@ -432,11 +487,12 @@ function renderTable(items) {
       <td style="white-space:nowrap;font-size:11px;color:#94a3b8;">${timeStr}</td>
       <td style="white-space:nowrap;">${freshDot}${dateStr}</td>
       <td>${confHtml}</td>
+      <td><button class="dismiss-btn" onclick="event.stopPropagation(); openDismissModal('${id}', '${src}')" title="Dismiss">&times;</button></td>
       <td>${commitHtml}</td>
     </tr>`;
 
     if (isExpanded) {
-      html += `<tr class="detail-row"><td colspan="9"><div class="detail-panel" id="detail-${id}"><div class="modal-loading">Loading...</div></div></td></tr>`;
+      html += `<tr class="detail-row"><td colspan="10"><div class="detail-panel" id="detail-${id}"><div class="modal-loading">Loading...</div></div></td></tr>`;
     }
   });
 
@@ -604,6 +660,131 @@ async function createLink(crimeId, type, linkedId, btn) {
     if (expandedId === crimeId) loadDetail(crimeId, 'police');
     loadStats();
   } catch { btn.textContent = 'Error'; btn.disabled = false; }
+}
+
+// ─── Dismiss Modal ────────────────────────────────────
+let dismissItemId = null, dismissSource = null;
+function openDismissModal(itemId, source) {
+  dismissItemId = itemId; dismissSource = source;
+  document.getElementById('dismiss-reason').value = '';
+  document.getElementById('dismiss-modal').classList.add('show');
+}
+function closeDismissModal() { document.getElementById('dismiss-modal').classList.remove('show'); dismissItemId = null; }
+document.getElementById('dismiss-modal').addEventListener('click', (e) => { if (e.target === e.currentTarget) closeDismissModal(); });
+
+async function confirmDismiss() {
+  if (!dismissItemId) return;
+  const reason = document.getElementById('dismiss-reason').value.trim();
+  try {
+    await fetch(`${BASE}/api/database/dismiss`, {
+      method: 'POST', credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ itemId: dismissItemId, source: dismissSource, reason })
+    });
+    closeDismissModal();
+    loadFeed(); // Refresh — dismissed item will be gone
+  } catch (err) { alert('Failed to dismiss: ' + err.message); }
+}
+
+// ─── Intel Modal ──────────────────────────────────────
+function closeIntelModal() { document.getElementById('intel-modal').classList.remove('show'); }
+document.getElementById('intel-modal').addEventListener('click', (e) => { if (e.target === e.currentTarget) closeIntelModal(); });
+
+async function openIntelModal(itemId, source) {
+  const modal = document.getElementById('intel-modal');
+  const body = document.getElementById('intel-modal-body');
+  const item = feedData.find(i => i.id === itemId && i.source === source);
+  if (!item) return;
+
+  document.getElementById('intel-modal-title').textContent = 'Intelligence Report — ' + (item.title || '').slice(0, 50);
+  body.innerHTML = '<div class="modal-loading">Searching for corroborating sources...</div>';
+  modal.classList.add('show');
+
+  // Find corroborating items: same location or similar keywords
+  const loc = (item.location || '').toLowerCase();
+  const words = (item.title || '').toLowerCase().split(/\s+/).filter(w => w.length > 4);
+  const corroborating = feedData.filter(other => {
+    if (other.id === itemId && other.source === source) return false;
+    const otherLoc = (other.location || '').toLowerCase();
+    const otherTitle = (other.title || '').toLowerCase();
+    // Match by location
+    if (loc && otherLoc && loc === otherLoc) return true;
+    // Match by keyword overlap (at least 2 significant words)
+    let matches = 0;
+    for (const w of words) { if (otherTitle.includes(w)) matches++; }
+    return matches >= 2;
+  });
+
+  // Build source cards
+  let cardsHtml = '';
+  if (corroborating.length === 0) {
+    cardsHtml = '<div class="intel-no-ai">No corroborating sources found in the current feed for this item.</div>';
+  } else {
+    // Try AI summary
+    let summaryHtml = '';
+    try {
+      const texts = [item, ...corroborating].map(i => `[${i.source}] ${i.title || ''} (${i.location || 'unknown'}, ${i.date || ''})`).join('\n');
+      const r = await fetch(`${BASE}/api/ai/summarise-intel`, {
+        method: 'POST', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ texts, itemTitle: item.title, itemLocation: item.location })
+      });
+      if (r.ok) {
+        const json = await r.json();
+        if (json.success && json.summary) {
+          summaryHtml = `<div class="intel-summary"><div class="intel-summary-label">AI Intelligence Summary</div>${escHtml(json.summary)}</div>`;
+        }
+      }
+    } catch {}
+    if (!summaryHtml) {
+      summaryHtml = `<div class="intel-no-ai">AI summary unavailable — add ANTHROPIC_API_KEY to enable. Showing ${corroborating.length} corroborating source(s) below.</div>`;
+    }
+
+    cardsHtml += summaryHtml;
+    cardsHtml += `<div class="intel-section-title">Primary Item</div>`;
+    cardsHtml += renderIntelCard(item);
+    cardsHtml += `<div class="intel-section-title">Corroborating Sources (${corroborating.length})</div>`;
+    corroborating.forEach(c => { cardsHtml += renderIntelCard(c); });
+  }
+
+  body.innerHTML = cardsHtml;
+}
+
+function renderIntelCard(item) {
+  const src = item.source || '';
+  const u = (item.url || '').toLowerCase();
+  let srcLabel = src;
+  if (src === 'police') srcLabel = 'Met Police';
+  else if (src === 'twitter') srcLabel = 'X / Twitter';
+  else if (src === 'telegram') srcLabel = 'Telegram';
+  else if (src === 'road') srcLabel = 'TfL Roads';
+  else if (src === 'lfb') srcLabel = 'London Fire Brigade';
+  else if (src === 'news') {
+    if (u.includes('bbc.co.uk') || u.includes('bbc.com')) srcLabel = 'BBC News';
+    else if (u.includes('mylondon') || u.includes('getwestlondon')) srcLabel = 'MyLondon';
+    else if (u.includes('standard.co.uk')) srcLabel = 'Evening Standard';
+    else if (u.includes('news.met.police.uk')) srcLabel = 'Met Police News';
+    else if (u.includes('reddit.com')) srcLabel = 'Reddit';
+    else { try { srcLabel = new URL(item.url).hostname.replace('www.',''); } catch { srcLabel = 'News'; } }
+  }
+
+  const catMap = { police: 'Official', twitter: 'Social Media', telegram: 'Social Media', bluesky: 'Social Media', road: 'Official', lfb: 'Official', news: 'News' };
+  const cat = catMap[src] || 'Other';
+  const catColor = cat === 'Official' ? '#fbbf24' : cat === 'Social Media' ? '#c084fc' : '#4ade80';
+
+  let dateStr = '';
+  if (item.date) { try { dateStr = new Date(item.date).toLocaleString('en-GB', { day: 'numeric', month: 'short', year: '2-digit', hour: '2-digit', minute: '2-digit' }); } catch {} }
+
+  const titleLink = item.url ? `<a href="${escHtml(item.url)}" target="_blank" rel="noopener">${escHtml((item.title || '').slice(0, 120))}</a>` : escHtml((item.title || '').slice(0, 120));
+
+  return `<div class="intel-source-card">
+    <div class="intel-card-header">
+      <span class="intel-card-source" style="color:${catColor}">${escHtml(srcLabel)} · ${cat}</span>
+      <span class="intel-card-date">${dateStr}</span>
+    </div>
+    <div class="intel-card-title">${titleLink}</div>
+    <div class="intel-card-meta">${escHtml(item.location || '—')}</div>
+  </div>`;
 }
 
 // ─── Pagination/Sort ──────────────────────────────────
