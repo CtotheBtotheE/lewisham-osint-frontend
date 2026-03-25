@@ -196,6 +196,23 @@
   </div>
 </div>
 
+<div class="modal-overlay" id="commit-modal">
+  <div class="modal" style="width:420px;">
+    <div class="modal-header">
+      <h3>Commit Item</h3>
+      <button class="modal-close" onclick="closeCommitModal()">&times;</button>
+    </div>
+    <div style="padding:16px 20px;">
+      <p style="font-size:12px;color:#94a3b8;margin-bottom:4px;">Why are you committing this item? This helps the system learn what's reliable.</p>
+      <textarea class="dismiss-textarea" id="commit-reason" placeholder="e.g. Verified incident, multiple sources confirm, eyewitness account..." style="border-color:#4ade80;"></textarea>
+      <div style="display:flex;gap:8px;justify-content:flex-end;">
+        <button class="dismiss-confirm-btn cancel" onclick="closeCommitModal()">Cancel</button>
+        <button class="dismiss-confirm-btn" style="background:#4ade80;color:#0f1117;" onclick="confirmCommit()">Commit</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="link-modal">
   <div class="modal">
     <div class="modal-header">
@@ -273,6 +290,11 @@
       <option value="">All items</option>
       <option value="linked">Linked only</option>
       <option value="unlinked">Unlinked only</option>
+    </select>
+    <select class="filter-select" id="filter-status">
+      <option value="">All statuses</option>
+      <option value="uncommitted">Uncommitted only</option>
+      <option value="committed">Committed only</option>
     </select>
     <button class="action-btn" id="btn-24h" onclick="toggleLast24h()" style="border-color:#f59e0b;color:#f59e0b;">Last 24h</button>
     <input type="date" class="filter-select" id="filter-date-from" title="From date" />
@@ -373,6 +395,12 @@ async function loadFeed() {
     const json = await r.json();
     totalRecords = json.total || 0;
     feedData = json.data || [];
+
+    // Client-side status filter (committed/uncommitted)
+    const statusFilter = document.getElementById('filter-status').value;
+    if (statusFilter === 'committed') feedData = feedData.filter(i => i.is_committed);
+    else if (statusFilter === 'uncommitted') feedData = feedData.filter(i => !i.is_committed);
+
     renderTable(feedData);
     renderPagination();
     const empty = document.getElementById('empty-state');
@@ -577,14 +605,42 @@ async function removeLink(pid, linkId) {
 }
 
 // ─── Commit/Uncommit ──────────────────────────────────
-async function toggleCommit(itemId, source, cb) {
+let commitItemId = null, commitSource = null, commitCb = null;
+
+function toggleCommit(itemId, source, cb) {
+  if (cb.checked) {
+    // Committing — open modal for reason
+    commitItemId = itemId; commitSource = source; commitCb = cb;
+    document.getElementById('commit-reason').value = '';
+    document.getElementById('commit-modal').classList.add('show');
+  } else {
+    // Uncommitting — do directly
+    doCommitAction(itemId, source, 'uncommit', cb);
+  }
+}
+
+function closeCommitModal() {
+  document.getElementById('commit-modal').classList.remove('show');
+  if (commitCb) { commitCb.checked = false; } // Revert checkbox
+  commitItemId = null; commitSource = null; commitCb = null;
+}
+document.getElementById('commit-modal').addEventListener('click', (e) => { if (e.target === e.currentTarget) closeCommitModal(); });
+
+async function confirmCommit() {
+  if (!commitItemId || !commitCb) return;
+  const reason = document.getElementById('commit-reason').value.trim();
+  document.getElementById('commit-modal').classList.remove('show');
+  await doCommitAction(commitItemId, commitSource, 'commit', commitCb, reason);
+  commitItemId = null; commitSource = null; commitCb = null;
+}
+
+async function doCommitAction(itemId, source, action, cb, reason) {
   cb.disabled = true;
-  const action = cb.checked ? 'commit' : 'uncommit';
   try {
     const r = await fetch(`${BASE}/api/database/crimes/${encodeURIComponent(itemId)}/${action}`, {
       method: 'POST', credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ source })
+      body: JSON.stringify({ source, reason })
     });
     const json = await r.json();
     if (!json.success) { cb.checked = !cb.checked; }
@@ -847,6 +903,7 @@ function toggleLast24h() {
 document.getElementById('search').addEventListener('input', () => { clearTimeout(searchTimeout); searchTimeout = setTimeout(() => { currentPage = 1; expandedId = null; loadFeed(); }, 300); });
 document.getElementById('filter-source').addEventListener('change', () => { currentPage = 1; expandedId = null; loadFeed(); });
 document.getElementById('filter-links').addEventListener('change', () => { currentPage = 1; expandedId = null; loadFeed(); });
+document.getElementById('filter-status').addEventListener('change', () => { currentPage = 1; expandedId = null; loadFeed(); });
 document.getElementById('filter-date-from').addEventListener('change', () => { currentPage = 1; expandedId = null; loadFeed(); });
 document.getElementById('filter-date-to').addEventListener('change', () => { currentPage = 1; expandedId = null; loadFeed(); });
 document.getElementById('modal-search').addEventListener('input', () => { clearTimeout(modalSearchTimeout); modalSearchTimeout = setTimeout(() => { modalPage = 1; loadModalResults(); }, 300); });
