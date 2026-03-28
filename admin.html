@@ -228,6 +228,8 @@
       font-size: 10px; padding: 3px 9px; border-radius: 5px; cursor: pointer;
       font-weight: 600; border: 1px solid; transition: all 0.15s;
     }
+    .layer-toggle-btn.events-layer { border-color: #f97316; color: #f97316; background: rgba(249,115,22,0.15); }
+    .layer-toggle-btn.events-layer.off { background: transparent; opacity: 0.4; }
     .layer-toggle-btn.live-layer { border-color: #c084fc; color: #c084fc; background: rgba(192,132,252,0.15); }
     .layer-toggle-btn.live-layer.off { background: transparent; opacity: 0.4; }
 
@@ -440,6 +442,7 @@
       <div class="card-header">
         <h2>Intel map — Lewisham borough</h2>
         <div style="display:flex;gap:6px;align-items:center;">
+          <button class="layer-toggle-btn events-layer" id="toggle-events" onclick="toggleMapLayer('events')">Events</button>
           <button class="layer-toggle-btn live-layer" id="toggle-live" onclick="toggleMapLayer('live')">Live Intel</button>
           <span style="font-size:11px;color:#475569;" id="map-count"></span>
         </div>
@@ -515,8 +518,8 @@
 
   const LEWISHAM = { lat: 51.4613, lng: -0.0117 };
   let map, allFeedItems = [];
-  let liveLayer;
-  let showLiveLayer = true;
+  let liveLayer, eventsLayer;
+  let showLiveLayer = true, showEventsLayer = true;
 
   const AREA_COORDS = {
     'lewisham': [51.4613, -0.0117], 'catford': [51.4530, -0.0220], 'brockley': [51.4740, -0.0260],
@@ -531,6 +534,10 @@
       showLiveLayer = !showLiveLayer;
       document.getElementById('toggle-live').classList.toggle('off', !showLiveLayer);
       if (showLiveLayer) map.addLayer(liveLayer); else map.removeLayer(liveLayer);
+    } else if (layer === 'events') {
+      showEventsLayer = !showEventsLayer;
+      document.getElementById('toggle-events').classList.toggle('off', !showEventsLayer);
+      if (showEventsLayer) map.addLayer(eventsLayer); else map.removeLayer(eventsLayer);
     }
   }
 
@@ -611,6 +618,7 @@
       maxZoom: 19
     }).addTo(map);
 
+    eventsLayer = L.layerGroup().addTo(map);
     liveLayer = L.layerGroup().addTo(map);
 
     fetch('https://mapit.mysociety.org/area/2492.geojson?simplify_tolerance=0.001')
@@ -767,6 +775,71 @@
 
   function escHtmlMap(s) { const d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML; }
 
+  async function loadEventsOnMap() {
+    eventsLayer.clearLayers();
+    try {
+      const r = await fetch(`${BASE}/api/events`, FETCH_OPTS);
+      const json = await r.json();
+      const events = json.data || [];
+
+      const SEV_COLOR = { critical: '#ef4444', major: '#f97316', minor: '#facc15', info: '#60a5fa' };
+      const SEV_RADIUS = { critical: 10, major: 8, minor: 6, info: 4 };
+
+      events.forEach(ev => {
+        if (!ev.lat || !ev.lng) return;
+        const color = SEV_COLOR[ev.severity] || '#60a5fa';
+        const radius = SEV_RADIUS[ev.severity] || 6;
+
+        L.circleMarker([ev.lat, ev.lng], {
+          radius,
+          fillColor: color,
+          color: ev.is_verified ? '#4ade80' : color,
+          weight: ev.is_verified ? 2 : 1,
+          fillOpacity: 0.85,
+        })
+        .bindTooltip(ev.title || '', { direction: 'top', className: 'live-tooltip-admin' })
+        .bindPopup(`<div style="width:280px;padding:12px;">
+          <div style="font-size:10px;color:${color};font-weight:700;text-transform:uppercase;">${escHtmlMap(ev.category)} &middot; ${ev.severity}</div>
+          <div style="font-size:13px;color:#fff;font-weight:600;margin:6px 0 4px;">${escHtmlMap(ev.title || '')}</div>
+          <div style="font-size:11px;color:#94a3b8;line-height:1.4;">${escHtmlMap((ev.summary || '').slice(0, 200))}</div>
+          <div style="font-size:10px;color:#475569;margin-top:8px;">
+            ${ev.source_count} source${ev.source_count !== 1 ? 's' : ''} &middot; ${ev.status} &middot; ${escHtmlMap(ev.area_name || '')}
+          </div>
+          <div style="margin-top:10px;display:flex;gap:6px;">
+            ${ev.is_verified ? '<span style="font-size:10px;color:#4ade80;font-weight:600;">VERIFIED</span>' :
+              `<button onclick="verifyEvent(${ev.id})" style="font-size:10px;padding:3px 8px;background:#4ade80;color:#000;border:none;border-radius:3px;cursor:pointer;font-weight:600;">Verify</button>`}
+            <button onclick="dismissEvent(${ev.id})" style="font-size:10px;padding:3px 8px;background:transparent;color:#ef4444;border:1px solid #ef4444;border-radius:3px;cursor:pointer;">Dismiss</button>
+          </div>
+        </div>`, { maxWidth: 300 })
+        .addTo(eventsLayer);
+      });
+
+      const el = document.getElementById('map-count');
+      el.textContent = events.length + ' events';
+    } catch (err) {
+      console.error('Events map error:', err.message);
+    }
+  }
+
+  async function verifyEvent(id) {
+    try {
+      await fetch(`${BASE}/api/database/events/${id}/verify`, { method: 'POST', credentials: 'include' });
+      loadEventsOnMap();
+    } catch {}
+  }
+
+  async function dismissEvent(id) {
+    if (!confirm('Dismiss this event?')) return;
+    try {
+      await fetch(`${BASE}/api/database/events/${id}/dismiss`, {
+        method: 'POST', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason: 'Dismissed from map' })
+      });
+      loadEventsOnMap();
+    } catch {}
+  }
+
   async function loadLiveMapIntel() {
     liveLayer.clearLayers();
     let liveCount = 0;
@@ -834,6 +907,7 @@
       fetchTfl(), fetchSocial(), fetchNews(), fetchTwitter(), fetchTflRoads(), fetchLfb()
     ]);
     buildFeed([...tflItems, ...socialItems, ...newsItems, ...twitterItems, ...roadItems, ...lfbItems]);
+    loadEventsOnMap();
     loadLiveMapIntel();
   }
 
