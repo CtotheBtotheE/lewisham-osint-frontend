@@ -104,6 +104,10 @@
     .icon-btn.tick.active { color: #4ade80; background: rgba(74,222,128,0.2); }
     .icon-btn.cross { color: #475569; }
     .icon-btn.cross:hover { color: #ef4444; background: rgba(239,68,68,0.15); }
+    .ai-suggest { font-size: 8px; font-weight: 700; padding: 1px 5px; border-radius: 3px; display: inline-block; margin-left: 4px; letter-spacing: 0.03em; }
+    .ai-suggest.commit { color: #4ade80; background: rgba(74,222,128,0.12); border: 1px solid rgba(74,222,128,0.3); }
+    .ai-suggest.dismiss { color: #f87171; background: rgba(239,68,68,0.12); border: 1px solid rgba(239,68,68,0.3); }
+    .ai-suggest.neutral { color: #94a3b8; background: rgba(148,163,184,0.1); border: 1px solid rgba(148,163,184,0.2); }
     .dismiss-textarea { width: 100%; padding: 10px; background: #0f1117; border: 1px solid #2d3148; border-radius: 6px; color: #e2e8f0; font-size: 13px; resize: vertical; min-height: 80px; margin: 10px 0; }
     .dismiss-textarea:focus { border-color: #ef4444; outline: none; }
     .dismiss-confirm-btn { padding: 8px 18px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; border: none; }
@@ -358,16 +362,104 @@ const FETCH_OPTS = { credentials: 'include' };
 let currentPage = 1, currentSort = 'date', currentOrder = 'DESC', totalRecords = 0;
 const LIMIT = 50;
 let searchTimeout = null, feedData = [], expandedId = null, expandedSource = null;
+let aiPatterns = null;
 let modalCrimeId = null, modalTab = 'tweet', modalPage = 1, modalSearchTimeout = null;
 
 function escHtml(s) { const d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML; }
+
+// ─── AI Pattern Learning ──────────────────────────────
+async function loadAiPatterns() {
+  try {
+    const r = await fetch(`${BASE}/api/database/ai-patterns`, FETCH_OPTS);
+    const json = await r.json();
+    if (json.success) aiPatterns = json.patterns;
+  } catch {}
+}
+
+const AI_STOP = new Set(['the','a','an','in','on','at','to','for','of','and','is','was','with','from','by','this','that','it','as','are','been','has','have','had','not','but','or','be','can','will','do','did','may','than','its','all','also','into','just','some','very','when','what','who','how','where','which','there','their','they','about','would','could','should']);
+
+function scoreItem(item) {
+  // Returns { suggestion: 'commit'|'dismiss'|'neutral', confidence: 0-100, reason: string }
+  if (!aiPatterns || (aiPatterns.totalCommitted + aiPatterns.totalDismissed) < 3) {
+    return { suggestion: 'neutral', confidence: 0, reason: 'Not enough data yet' };
+  }
+
+  let commitScore = 0, dismissScore = 0;
+  const reasons = [];
+
+  // 1. Source score
+  const srcData = aiPatterns.sourceScores[item.source];
+  if (srcData) {
+    const total = srcData.commit + srcData.dismiss;
+    if (total >= 2) {
+      const ratio = srcData.commit / total;
+      if (ratio > 0.65) { commitScore += 20; reasons.push('source often committed'); }
+      else if (ratio < 0.35) { dismissScore += 20; reasons.push('source often dismissed'); }
+    }
+  }
+
+  // 2. Location score
+  const loc = (item.location || '').toLowerCase().trim();
+  if (loc && aiPatterns.locationScores[loc]) {
+    const ld = aiPatterns.locationScores[loc];
+    const total = ld.commit + ld.dismiss;
+    if (total >= 2) {
+      const ratio = ld.commit / total;
+      if (ratio > 0.65) { commitScore += 15; reasons.push('location often committed'); }
+      else if (ratio < 0.35) { dismissScore += 15; reasons.push('location often dismissed'); }
+    }
+  }
+
+  // 3. Category score (police)
+  if (item.category) {
+    const cat = item.category.toLowerCase().replace(/-/g, ' ').trim();
+    const cd = aiPatterns.categoryScores[cat];
+    if (cd) {
+      const total = cd.commit + cd.dismiss;
+      if (total >= 2) {
+        const ratio = cd.commit / total;
+        if (ratio > 0.65) { commitScore += 15; reasons.push('category often committed'); }
+        else if (ratio < 0.35) { dismissScore += 15; reasons.push('category often dismissed'); }
+      }
+    }
+  }
+
+  // 4. Keyword score
+  const words = (item.title || '').toLowerCase().replace(/[^a-z0-9\s]/g, '').split(/\s+/).filter(w => w.length > 3 && !AI_STOP.has(w));
+  let kwCommit = 0, kwDismiss = 0, kwCount = 0;
+  for (const w of words) {
+    const kd = aiPatterns.keywordScores[w];
+    if (kd) {
+      kwCommit += kd.commit;
+      kwDismiss += kd.dismiss;
+      kwCount++;
+    }
+  }
+  if (kwCount >= 2 && (kwCommit + kwDismiss) >= 3) {
+    const ratio = kwCommit / (kwCommit + kwDismiss);
+    if (ratio > 0.65) { commitScore += 25; reasons.push('keywords match committed items'); }
+    else if (ratio < 0.35) { dismissScore += 25; reasons.push('keywords match dismissed items'); }
+  }
+
+  // Calculate final suggestion
+  const total = commitScore + dismissScore;
+  if (total < 15) return { suggestion: 'neutral', confidence: 0, reason: 'Insufficient pattern data' };
+
+  if (commitScore > dismissScore) {
+    const conf = Math.min(95, Math.round((commitScore / (commitScore + dismissScore)) * 100));
+    return { suggestion: 'commit', confidence: conf, reason: reasons.join(', ') };
+  } else {
+    const conf = Math.min(95, Math.round((dismissScore / (commitScore + dismissScore)) * 100));
+    return { suggestion: 'dismiss', confidence: conf, reason: reasons.join(', ') };
+  }
+}
 
 // ─── Auth ─────────────────────────────────────────────
 async function checkSession() {
   try {
     const r = await fetch(`${BASE}/api/auth/session`, FETCH_OPTS);
     const data = await r.json();
-    if (data.authenticated) { document.getElementById('login-overlay').classList.add('hidden'); loadStats(); loadFeed(); }
+    if (data.authenticated) { document.getElementById('login-overlay').classList.add('hidden'); loadAiPatterns(); loadStats(); loadFeed(); }
   } catch {}
 }
 
@@ -522,11 +614,19 @@ function renderTable(items) {
     // Unique ID — short hash
     const shortId = (item.id || '').slice(0, 8).toUpperCase();
 
+    // AI suggestion
+    const aiScore = scoreItem(item);
+    let aiBadge = '';
+    if (aiScore.confidence >= 50) {
+      const cls = aiScore.suggestion === 'commit' ? 'commit' : 'dismiss';
+      aiBadge = `<span class="ai-suggest ${cls}" title="AI: ${escHtml(aiScore.reason)}">AI: ${aiScore.suggestion} ${aiScore.confidence}%</span>`;
+    }
+
     html += `<tr class="expandable" onclick="toggleDetail('${id}', '${src}')">
       <td style="font-family:monospace;font-size:10px;color:#64748b;">${shortId}</td>
       <td>${catBadge}</td>
       <td>${srcBadge}${srcArrow}</td>
-      <td class="desc-cell">${desc}</td>
+      <td class="desc-cell">${desc}${aiBadge}</td>
       <td style="text-transform:capitalize;">${loc}</td>
       <td style="white-space:nowrap;font-size:11px;color:#94a3b8;">${timeStr}</td>
       <td style="white-space:nowrap;">${freshDot}${dateStr}</td>
