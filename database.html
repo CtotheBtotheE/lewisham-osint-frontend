@@ -461,6 +461,13 @@
 
 const BASE = 'https://lewisham-osint-backend.onrender.com';
 const FETCH_OPTS = { credentials: 'include' };
+let csrfToken = '';
+function postOpts(body) {
+  const opts = { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' } };
+  if (csrfToken) opts.headers['X-CSRF-Token'] = csrfToken;
+  if (body) opts.body = JSON.stringify(body);
+  return opts;
+}
 let currentPage = 1, currentSort = 'date', currentOrder = 'DESC', totalRecords = 0;
 const LIMIT = 50;
 let searchTimeout = null, feedData = [], expandedId = null, expandedSource = null;
@@ -559,7 +566,10 @@ async function checkSession() {
   try {
     const r = await fetch(`${BASE}/api/auth/session`, FETCH_OPTS);
     const data = await r.json();
-    if (data.authenticated) { document.getElementById('login-overlay').classList.add('hidden'); loadAiPatterns(); loadFeed(); }
+    if (data.authenticated) {
+      try { const cr = await fetch(`${BASE}/api/auth/csrf`, FETCH_OPTS); const cd = await cr.json(); if (cd.csrfToken) csrfToken = cd.csrfToken; } catch {}
+      document.getElementById('login-overlay').classList.add('hidden'); loadAiPatterns(); loadFeed();
+    }
   } catch {}
 }
 
@@ -571,7 +581,7 @@ document.getElementById('login-form').addEventListener('submit', async (e) => {
     const r = await fetch(`${BASE}/api/auth/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
       body: JSON.stringify({ password: document.getElementById('password').value, totp: document.getElementById('totp').value }) });
     const data = await r.json();
-    if (data.success) { document.getElementById('login-overlay').classList.add('hidden'); loadFeed(); }
+    if (data.success) { if (data.csrfToken) csrfToken = data.csrfToken; document.getElementById('login-overlay').classList.add('hidden'); loadFeed(); }
     else { errEl.textContent = data.error || 'Invalid credentials.'; errEl.classList.add('show'); }
   } catch { errEl.textContent = 'Connection error.'; errEl.classList.add('show'); }
   btn.disabled = false;
@@ -827,11 +837,7 @@ async function confirmCommit() {
 async function doCommitAction(itemId, source, action, el, reason) {
   el.style.pointerEvents = 'none'; el.style.opacity = '0.4';
   try {
-    const r = await fetch(`${BASE}/api/database/crimes/${encodeURIComponent(itemId)}/${action}`, {
-      method: 'POST', credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ source, reason })
-    });
+    const r = await fetch(`${BASE}/api/database/crimes/${encodeURIComponent(itemId)}/${action}`, postOpts({ source, reason }));
     const json = await r.json();
     if (json.success) {
       const nowCommitted = action === 'commit';
@@ -899,7 +905,7 @@ function modalChangePage(d) { modalPage = Math.max(1, modalPage + d); loadModalR
 async function createLink(crimeId, type, linkedId, btn) {
   btn.disabled = true; btn.textContent = '...';
   try {
-    await fetch(`${BASE}/api/database/crimes/${encodeURIComponent(crimeId)}/links`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ linked_type: type, linked_id: linkedId }) });
+    await fetch(`${BASE}/api/database/crimes/${encodeURIComponent(crimeId)}/links`, postOpts({ linked_type: type, linked_id: linkedId }));
     btn.textContent = 'Linked'; btn.style.color = '#4ade80'; btn.style.borderColor = '#4ade80';
     if (expandedId === crimeId) loadDetail(crimeId, 'police');
   } catch { btn.textContent = 'Error'; btn.disabled = false; }
@@ -918,11 +924,7 @@ async function confirmDismiss() {
   if (!dismissItemId) return;
   const reason = document.getElementById('dismiss-reason').value.trim();
   try {
-    await fetch(`${BASE}/api/database/dismiss`, {
-      method: 'POST', credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ itemId: dismissItemId, source: dismissSource, reason })
-    });
+    await fetch(`${BASE}/api/database/dismiss`, postOpts({ itemId: dismissItemId, source: dismissSource, reason }));
     closeDismissModal();
     loadFeed(); // Refresh — dismissed item will be gone
   } catch (err) { alert('Failed to dismiss: ' + err.message); }
@@ -958,11 +960,7 @@ async function submitIntelVerdict(cardId, itemId, source) {
 
   // Save to backend for learning
   try {
-    await fetch(`${BASE}/api/database/intel-verdict`, {
-      method: 'POST', credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ itemId: v.itemId, source: v.source, verdict: v.verdict, reason })
-    });
+    await fetch(`${BASE}/api/database/intel-verdict`, postOpts({ itemId: v.itemId, source: v.source, verdict: v.verdict, reason }));
   } catch {}
 
   // Replace actions with verdict badge
@@ -1008,11 +1006,7 @@ async function openIntelModal(itemId, source) {
     let summaryHtml = '';
     try {
       const texts = [item, ...corroborating].map(i => `[${i.source}] ${i.title || ''} (${i.location || 'unknown'}, ${i.date || ''})`).join('\n');
-      const r = await fetch(`${BASE}/api/ai/summarise-intel`, {
-        method: 'POST', credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ texts, itemTitle: item.title, itemLocation: item.location })
-      });
+      const r = await fetch(`${BASE}/api/ai/summarise-intel`, postOpts({ texts, itemTitle: item.title, itemLocation: item.location }));
       if (r.ok) {
         const json = await r.json();
         if (json.success && json.summary) {
@@ -1156,11 +1150,7 @@ async function clusterDismiss(ci, di) {
   const el = document.getElementById(`cluster-dupe-${ci}-${di}`);
   el.style.opacity = '0.3'; el.style.pointerEvents = 'none';
   try {
-    await fetch(`${BASE}/api/database/dismiss`, {
-      method: 'POST', credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ itemId: item.id, source: item.source, reason: 'Duplicate (auto-dedup)' })
-    });
+    await fetch(`${BASE}/api/database/dismiss`, postOpts({ itemId: item.id, source: item.source, reason: 'Duplicate (auto-dedup)' }));
     el.innerHTML = '<div class="cluster-dupe-meta" style="color:#f87171;padding:4px 0;">Dismissed</div>';
     el.style.opacity = '1';
   } catch { el.style.opacity = '1'; el.style.pointerEvents = ''; }
@@ -1179,11 +1169,7 @@ async function dismissAllDuplicates() {
   for (const cluster of clustersData) {
     for (const dup of cluster.duplicates) {
       try {
-        await fetch(`${BASE}/api/database/dismiss`, {
-          method: 'POST', credentials: 'include',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ itemId: dup.id, source: dup.source, reason: 'Duplicate (bulk dedup)' })
-        });
+        await fetch(`${BASE}/api/database/dismiss`, postOpts({ itemId: dup.id, source: dup.source, reason: 'Duplicate (bulk dedup)' }));
       } catch {}
     }
   }
@@ -1336,18 +1322,14 @@ async function toggleEventSources(id) {
 
 async function verifyEventDb(id) {
   try {
-    await fetch(`${BASE}/api/database/events/${id}/verify`, { method: 'POST', credentials: 'include' });
+    await fetch(`${BASE}/api/database/events/${id}/verify`, postOpts());
     loadEvents();
   } catch {}
 }
 
 async function dismissEventDb(id) {
   try {
-    await fetch(`${BASE}/api/database/events/${id}/dismiss`, {
-      method: 'POST', credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ reason: 'Dismissed from database' })
-    });
+    await fetch(`${BASE}/api/database/events/${id}/dismiss`, postOpts({ reason: 'Dismissed from database' }));
     loadEvents();
   } catch {}
 }
@@ -1356,7 +1338,7 @@ async function runPipeline() {
   const btn = document.querySelector('[onclick="runPipeline()"]');
   if (btn) { btn.disabled = true; btn.textContent = 'Running...'; }
   try {
-    const r = await fetch(`${BASE}/api/pipeline/run`, { method: 'POST', credentials: 'include' });
+    const r = await fetch(`${BASE}/api/pipeline/run`, postOpts());
     const json = await r.json();
     if (btn) btn.textContent = `Done: ${json.stats?.newEvents || 0} new, ${json.stats?.updatedEvents || 0} updated`;
     setTimeout(() => { if (btn) { btn.textContent = 'Run Pipeline'; btn.disabled = false; } loadEvents(); }, 2000);

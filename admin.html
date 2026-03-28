@@ -517,6 +517,14 @@
 
   const BASE = 'https://lewisham-osint-backend.onrender.com';
   const FETCH_OPTS = { credentials: 'include' };
+  let csrfToken = '';
+
+  function postOpts(body) {
+    const opts = { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' } };
+    if (csrfToken) opts.headers['X-CSRF-Token'] = csrfToken;
+    if (body) opts.body = JSON.stringify(body);
+    return opts;
+  }
 
   const LEWISHAM = { lat: 51.4613, lng: -0.0117 };
   let map, allFeedItems = [];
@@ -527,6 +535,8 @@
       const r = await fetch(`${BASE}/api/auth/session`, FETCH_OPTS);
       const data = await r.json();
       if (data.authenticated) {
+        // Fetch CSRF token for existing session
+        try { const cr = await fetch(`${BASE}/api/auth/csrf`, FETCH_OPTS); const cd = await cr.json(); if (cd.csrfToken) csrfToken = cd.csrfToken; } catch {}
         document.getElementById('login-overlay').classList.add('hidden');
         initMap();
         loadAll();
@@ -554,6 +564,7 @@
       });
       const data = await r.json();
       if (data.success) {
+        if (data.csrfToken) csrfToken = data.csrfToken;
         document.getElementById('login-overlay').classList.add('hidden');
         initMap();
         loadAll();
@@ -804,7 +815,7 @@
 
   async function verifyEvent(id) {
     try {
-      await fetch(`${BASE}/api/database/events/${id}/verify`, { method: 'POST', credentials: 'include' });
+      await fetch(`${BASE}/api/database/events/${id}/verify`, postOpts());
       loadEventsOnMap();
     } catch {}
   }
@@ -812,11 +823,7 @@
   async function dismissEvent(id) {
     if (!confirm('Dismiss this event?')) return;
     try {
-      await fetch(`${BASE}/api/database/events/${id}/dismiss`, {
-        method: 'POST', credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ reason: 'Dismissed from map' })
-      });
+      await fetch(`${BASE}/api/database/events/${id}/dismiss`, postOpts({ reason: 'Dismissed from map' }));
       loadEventsOnMap();
     } catch {}
   }
