@@ -109,6 +109,33 @@
     .ai-suggest.commit { color: #4ade80; background: rgba(74,222,128,0.12); border: 1px solid rgba(74,222,128,0.3); }
     .ai-suggest.dismiss { color: #f87171; background: rgba(239,68,68,0.12); border: 1px solid rgba(239,68,68,0.3); }
     .ai-suggest.neutral { color: #94a3b8; background: rgba(148,163,184,0.1); border: 1px solid rgba(148,163,184,0.2); }
+
+    .clusters-panel { background: #1a1d2e; border: 1px solid #c084fc; border-radius: 10px; margin-bottom: 16px; overflow: hidden; }
+    .clusters-header { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; border-bottom: 1px solid #2d3148; }
+    .clusters-title { font-size: 13px; font-weight: 600; color: #c084fc; }
+    .clusters-count { font-size: 11px; color: #64748b; margin-left: 8px; }
+    .clusters-list { max-height: 500px; overflow-y: auto; }
+    .cluster-group { border-bottom: 1px solid #1e2235; }
+    .cluster-group:last-child { border-bottom: none; }
+    .cluster-primary { display: flex; align-items: center; gap: 10px; padding: 10px 16px; cursor: pointer; transition: background 0.1s; }
+    .cluster-primary:hover { background: #1e2235; }
+    .cluster-badge { flex-shrink: 0; font-size: 10px; font-weight: 700; color: #c084fc; background: rgba(192,132,252,0.15); padding: 2px 7px; border-radius: 4px; }
+    .cluster-primary-info { flex: 1; min-width: 0; }
+    .cluster-primary-title { font-size: 12px; color: #e2e8f0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .cluster-primary-meta { font-size: 10px; color: #64748b; margin-top: 2px; }
+    .cluster-expand { color: #64748b; font-size: 12px; transition: transform 0.2s; }
+    .cluster-expand.open { transform: rotate(90deg); }
+    .cluster-dupes { display: none; background: #0f1117; padding: 0 16px 8px 40px; }
+    .cluster-dupes.show { display: block; }
+    .cluster-dupe-item { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-top: 1px solid #1e2235; }
+    .cluster-dupe-item:first-child { border-top: none; }
+    .cluster-dupe-info { flex: 1; min-width: 0; }
+    .cluster-dupe-title { font-size: 11px; color: #94a3b8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .cluster-dupe-meta { font-size: 9px; color: #475569; }
+    .cluster-dismiss-btn { flex-shrink: 0; font-size: 9px; padding: 2px 8px; border: 1px solid #ef4444; border-radius: 3px; background: transparent; color: #f87171; cursor: pointer; }
+    .cluster-dismiss-btn:hover { background: rgba(239,68,68,0.15); }
+    .cluster-keep-btn { flex-shrink: 0; font-size: 9px; padding: 2px 8px; border: 1px solid #4ade80; border-radius: 3px; background: transparent; color: #4ade80; cursor: pointer; }
+    .cluster-keep-btn:hover { background: rgba(74,222,128,0.15); }
     .dismiss-textarea { width: 100%; padding: 10px; background: #0f1117; border: 1px solid #2d3148; border-radius: 6px; color: #e2e8f0; font-size: 13px; resize: vertical; min-height: 80px; margin: 10px 0; }
     .dismiss-textarea:focus { border-color: #ef4444; outline: none; }
     .dismiss-confirm-btn { padding: 8px 18px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; border: none; }
@@ -306,7 +333,24 @@
     <input type="date" class="filter-select" id="filter-date-from" title="From date" />
     <input type="date" class="filter-select" id="filter-date-to" title="To date" />
     <button class="action-btn" onclick="exportCsv()">Export CSV</button>
+    <button class="action-btn" id="btn-dedup" onclick="toggleDedup()" style="border-color:#c084fc;color:#c084fc;">Deduplicate</button>
     <a href="/admin/dismissed" class="action-btn" style="border-color:#ef4444;color:#f87171;text-decoration:none;">Dismissed</a>
+  </div>
+
+  <div class="clusters-panel hidden" id="clusters-panel">
+    <div class="clusters-header">
+      <div>
+        <span class="clusters-title">Duplicate Clusters</span>
+        <span class="clusters-count" id="clusters-count"></span>
+      </div>
+      <div style="display:flex;gap:6px;">
+        <button class="action-btn" onclick="dismissAllDuplicates()" style="border-color:#ef4444;color:#f87171;font-size:10px;">Dismiss all duplicates</button>
+        <button class="action-btn" onclick="toggleDedup()" style="font-size:10px;">Close</button>
+      </div>
+    </div>
+    <div id="clusters-list" class="clusters-list">
+      <div class="modal-loading">Scanning for duplicates...</div>
+    </div>
   </div>
 
   <div class="table-wrap" id="view-table">
@@ -993,6 +1037,134 @@ function sortBy(col) {
   currentPage = 1; expandedId = null; loadFeed();
 }
 function refreshAll() { expandedId = null; loadStats(); loadFeed(); }
+
+// ─── Deduplication ───────────────────────────────────
+let clustersData = [];
+let dedupOpen = false;
+
+async function toggleDedup() {
+  dedupOpen = !dedupOpen;
+  const panel = document.getElementById('clusters-panel');
+  const btn = document.getElementById('btn-dedup');
+
+  if (dedupOpen) {
+    panel.classList.remove('hidden');
+    btn.style.background = 'rgba(192,132,252,0.15)';
+    document.getElementById('clusters-list').innerHTML = '<div class="modal-loading">Scanning for duplicates...</div>';
+    try {
+      const r = await fetch(`${BASE}/api/database/clusters`, FETCH_OPTS);
+      const json = await r.json();
+      if (!json.success) throw new Error(json.error);
+      clustersData = json.clusters || [];
+      document.getElementById('clusters-count').textContent = json.totalClusters + ' clusters · ' + json.totalDuplicates + ' duplicates';
+      renderClusters();
+    } catch (err) {
+      document.getElementById('clusters-list').innerHTML = '<div class="modal-loading">Error: ' + escHtml(err.message) + '</div>';
+    }
+  } else {
+    panel.classList.add('hidden');
+    btn.style.background = '';
+  }
+}
+
+function renderClusters() {
+  const el = document.getElementById('clusters-list');
+  if (clustersData.length === 0) {
+    el.innerHTML = '<div class="modal-loading" style="color:#4ade80;">No duplicates found — feed is clean.</div>';
+    return;
+  }
+
+  let html = '';
+  clustersData.forEach((cluster, ci) => {
+    const p = cluster.primary;
+    const srcLabel = p.source === 'twitter' ? 'Twitter' : p.source === 'news' ? 'News' : p.source === 'telegram' ? 'Telegram' : p.source === 'road' ? 'TfL' : p.source === 'lfb' ? 'LFB' : p.source;
+    let dateStr = '';
+    try { dateStr = new Date(p.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }); } catch {}
+
+    html += `<div class="cluster-group" id="cluster-${ci}">
+      <div class="cluster-primary" onclick="toggleCluster(${ci})">
+        <span class="cluster-badge">${cluster.count}x</span>
+        <div class="cluster-primary-info">
+          <div class="cluster-primary-title">${escHtml((p.title || '').slice(0, 120))}</div>
+          <div class="cluster-primary-meta">${escHtml(srcLabel)} · ${dateStr} · ${cluster.sources.join(', ')}</div>
+        </div>
+        <span class="cluster-expand" id="cluster-arrow-${ci}">&#9654;</span>
+      </div>
+      <div class="cluster-dupes" id="cluster-dupes-${ci}">`;
+
+    cluster.duplicates.forEach((d, di) => {
+      const dSrc = d.source === 'twitter' ? 'Twitter' : d.source === 'news' ? 'News' : d.source === 'telegram' ? 'Telegram' : d.source === 'road' ? 'TfL' : d.source === 'lfb' ? 'LFB' : d.source;
+      let dDate = '';
+      try { dDate = new Date(d.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }); } catch {}
+      const urlLink = d.url ? ` <a href="${escHtml(d.url)}" target="_blank" class="src-link" onclick="event.stopPropagation()">&#x2197;</a>` : '';
+
+      html += `<div class="cluster-dupe-item" id="cluster-dupe-${ci}-${di}">
+        <div class="cluster-dupe-info">
+          <div class="cluster-dupe-title">${escHtml((d.title || '').slice(0, 140))}${urlLink}</div>
+          <div class="cluster-dupe-meta">${escHtml(dSrc)} · ${dDate}</div>
+        </div>
+        <button class="cluster-keep-btn" onclick="event.stopPropagation();clusterKeep(${ci},${di})">Keep</button>
+        <button class="cluster-dismiss-btn" onclick="event.stopPropagation();clusterDismiss(${ci},${di})">Dismiss</button>
+      </div>`;
+    });
+
+    html += '</div></div>';
+  });
+
+  el.innerHTML = html;
+}
+
+function toggleCluster(ci) {
+  const dupes = document.getElementById('cluster-dupes-' + ci);
+  const arrow = document.getElementById('cluster-arrow-' + ci);
+  dupes.classList.toggle('show');
+  arrow.classList.toggle('open');
+}
+
+async function clusterDismiss(ci, di) {
+  const item = clustersData[ci]?.duplicates?.[di];
+  if (!item) return;
+  const el = document.getElementById(`cluster-dupe-${ci}-${di}`);
+  el.style.opacity = '0.3'; el.style.pointerEvents = 'none';
+  try {
+    await fetch(`${BASE}/api/database/dismiss`, {
+      method: 'POST', credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ itemId: item.id, source: item.source, reason: 'Duplicate (auto-dedup)' })
+    });
+    el.innerHTML = '<div class="cluster-dupe-meta" style="color:#f87171;padding:4px 0;">Dismissed</div>';
+    el.style.opacity = '1';
+  } catch { el.style.opacity = '1'; el.style.pointerEvents = ''; }
+}
+
+function clusterKeep(ci, di) {
+  const el = document.getElementById(`cluster-dupe-${ci}-${di}`);
+  el.innerHTML = '<div class="cluster-dupe-meta" style="color:#4ade80;padding:4px 0;">Kept</div>';
+}
+
+async function dismissAllDuplicates() {
+  if (!confirm('Dismiss all ' + clustersData.reduce((s, c) => s + c.duplicates.length, 0) + ' duplicate items? They will be moved to the Dismissed page.')) return;
+  const btn = document.querySelector('.clusters-header .action-btn[style*="ef4444"]');
+  if (btn) { btn.disabled = true; btn.textContent = 'Dismissing...'; }
+
+  for (const cluster of clustersData) {
+    for (const dup of cluster.duplicates) {
+      try {
+        await fetch(`${BASE}/api/database/dismiss`, {
+          method: 'POST', credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ itemId: dup.id, source: dup.source, reason: 'Duplicate (bulk dedup)' })
+        });
+      } catch {}
+    }
+  }
+
+  if (btn) { btn.textContent = 'Done'; }
+  loadFeed();
+  // Re-scan
+  setTimeout(() => toggleDedup(), 500);
+  setTimeout(() => toggleDedup(), 1000);
+}
 
 // ─── Export CSV ───────────────────────────────────────
 async function exportCsv() {
