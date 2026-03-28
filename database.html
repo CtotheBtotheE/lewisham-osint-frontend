@@ -359,6 +359,25 @@
   </div>
 </div>
 
+<div class="modal-overlay" id="cleanse-modal">
+  <div class="modal" style="width:440px;">
+    <div class="modal-header">
+      <h3>Cleanse Data</h3>
+      <button class="modal-close" onclick="closeCleanseModal()">&times;</button>
+    </div>
+    <div style="padding:16px 20px;">
+      <p style="font-size:12px;color:#f87171;margin-bottom:12px;">This will permanently delete all records before the selected date. This cannot be undone.</p>
+      <label style="font-size:12px;color:#94a3b8;display:block;margin-bottom:4px;">Delete everything before:</label>
+      <input type="date" id="cleanse-date" style="width:100%;padding:8px 10px;background:#0f1117;border:1px solid #2d3148;border-radius:8px;color:#e2e8f0;font-size:13px;margin-bottom:16px;" />
+      <div id="cleanse-result" style="font-size:11px;color:#4ade80;margin-bottom:12px;display:none;"></div>
+      <div style="display:flex;gap:8px;justify-content:flex-end;">
+        <button class="dismiss-confirm-btn cancel" onclick="closeCleanseModal()">Cancel</button>
+        <button class="dismiss-confirm-btn red" id="cleanse-confirm-btn" onclick="confirmCleanse()">Delete Old Data</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="intel-modal">
   <div class="modal" style="width:680px;">
     <div class="modal-header">
@@ -485,6 +504,7 @@
         <option value="resolved">Resolved</option>
       </select>
       <button class="action-btn" onclick="runPipeline()" style="border-color:#f97316;color:#f97316;">Run Pipeline</button>
+      <button class="action-btn" onclick="openCleanseModal()" style="border-color:#ef4444;color:#ef4444;">Cleanse Data</button>
       <span style="font-size:11px;color:#475569;" id="events-count"></span>
     </div>
     <div id="events-list"></div>
@@ -1419,6 +1439,48 @@ async function runPipeline() {
     if (btn) btn.textContent = `Done: ${json.stats?.newEvents || 0} new, ${json.stats?.updatedEvents || 0} updated`;
     setTimeout(() => { if (btn) { btn.textContent = 'Run Pipeline'; btn.disabled = false; } loadEvents(); }, 2000);
   } catch { if (btn) { btn.textContent = 'Error'; btn.disabled = false; } }
+}
+
+function openCleanseModal() {
+  const d = new Date(); d.setDate(d.getDate() - 1);
+  document.getElementById('cleanse-date').value = d.toISOString().slice(0, 10);
+  document.getElementById('cleanse-result').style.display = 'none';
+  document.getElementById('cleanse-confirm-btn').disabled = false;
+  document.getElementById('cleanse-confirm-btn').textContent = 'Delete Old Data';
+  document.getElementById('cleanse-modal').classList.add('show');
+}
+function closeCleanseModal() { document.getElementById('cleanse-modal').classList.remove('show'); }
+document.getElementById('cleanse-modal').addEventListener('click', (e) => { if (e.target === e.currentTarget) closeCleanseModal(); });
+
+async function confirmCleanse() {
+  const date = document.getElementById('cleanse-date').value;
+  if (!date) return;
+  if (!confirm(`Permanently delete ALL data before ${date}? This cannot be undone.`)) return;
+  const btn = document.getElementById('cleanse-confirm-btn');
+  btn.disabled = true; btn.textContent = 'Deleting...';
+  try {
+    const r = await fetch(`${BASE}/api/database/cleanse`, postOpts({ before: date }));
+    const json = await r.json();
+    if (json.success) {
+      const d = json.deleted || {};
+      const parts = [];
+      if (d.tweets) parts.push(`${d.tweets} tweets`);
+      if (d.articles) parts.push(`${d.articles} articles`);
+      if (d.crimes) parts.push(`${d.crimes} crimes`);
+      if (d.events) parts.push(`${d.events} events`);
+      if (d.dismissed) parts.push(`${d.dismissed} dismissed`);
+      if (d.committed) parts.push(`${d.committed} committed`);
+      if (d.verdicts) parts.push(`${d.verdicts} verdicts`);
+      if (d.processed) parts.push(`${d.processed} processed`);
+      const el = document.getElementById('cleanse-result');
+      el.textContent = parts.length ? `Deleted: ${parts.join(', ')}` : 'No records found before that date.';
+      el.style.display = 'block';
+      btn.textContent = 'Done';
+      loadFeed(); loadEvents();
+    } else {
+      btn.textContent = 'Error'; btn.disabled = false;
+    }
+  } catch { btn.textContent = 'Error'; btn.disabled = false; }
 }
 
 document.getElementById('events-search').addEventListener('input', () => { setTimeout(loadEvents, 300); });
