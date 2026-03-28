@@ -325,8 +325,8 @@
           <th>Location</th>
           <th>Time</th>
           <th data-sort="date" onclick="sortBy('date')">Date</th>
-          <th style="width:50px;">Dismiss</th>
           <th>Committed</th>
+          <th style="width:50px;">Dismiss</th>
         </tr>
       </thead>
       <tbody id="table-body"></tbody>
@@ -521,8 +521,8 @@ function renderTable(items) {
       <td style="text-transform:capitalize;">${loc}</td>
       <td style="white-space:nowrap;font-size:11px;color:#94a3b8;">${timeStr}</td>
       <td style="white-space:nowrap;">${freshDot}${dateStr}</td>
-      <td><button class="dismiss-btn" onclick="event.stopPropagation(); openDismissModal('${id}', '${src}')" title="Dismiss">&times;</button></td>
       <td>${commitHtml}</td>
+      <td><button class="dismiss-btn" onclick="event.stopPropagation(); openDismissModal('${id}', '${src}')" title="Dismiss">&times;</button></td>
     </tr>`;
 
     if (isExpanded) {
