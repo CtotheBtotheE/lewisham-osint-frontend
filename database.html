@@ -53,6 +53,8 @@
     table { width: 100%; border-collapse: collapse; }
     thead th { padding: 10px 12px; font-size: 11px; font-weight: 500; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; text-align: left; border-bottom: 1px solid #2d3148; cursor: pointer; user-select: none; white-space: nowrap; }
     thead th:hover { color: #94a3b8; }
+    .th-label { cursor: pointer; user-select: none; white-space: nowrap; }
+    .th-label:hover { color: #94a3b8; }
     .th-filter { display: block; margin-top: 4px; padding: 3px 4px; border: 1px solid #2d3148; border-radius: 4px; background: #0f1117; color: #94a3b8; font-size: 10px; width: 100%; cursor: pointer; outline: none; }
     .th-filter:focus { border-color: #3b82f6; }
     thead th.sorted { color: #3b82f6; }
@@ -333,24 +335,18 @@
     <input type="date" class="filter-select" id="filter-date-from" title="From date" />
     <input type="date" class="filter-select" id="filter-date-to" title="To date" />
     <button class="action-btn" onclick="exportCsv()">Export CSV</button>
-    <button class="action-btn" id="btn-dedup" onclick="toggleDedup()" style="border-color:#c084fc;color:#c084fc;">Deduplicate</button>
     <a href="/admin/dismissed" class="action-btn" style="border-color:#ef4444;color:#f87171;text-decoration:none;">Dismissed</a>
   </div>
 
   <div class="clusters-panel hidden" id="clusters-panel">
     <div class="clusters-header">
       <div>
-        <span class="clusters-title">Duplicate Clusters</span>
+        <span class="clusters-title">Duplicates Found</span>
         <span class="clusters-count" id="clusters-count"></span>
       </div>
-      <div style="display:flex;gap:6px;">
-        <button class="action-btn" onclick="dismissAllDuplicates()" style="border-color:#ef4444;color:#f87171;font-size:10px;">Dismiss all duplicates</button>
-        <button class="action-btn" onclick="toggleDedup()" style="font-size:10px;">Close</button>
-      </div>
+      <button class="action-btn" onclick="dismissAllDuplicates()" style="border-color:#ef4444;color:#f87171;font-size:10px;">Dismiss all duplicates</button>
     </div>
-    <div id="clusters-list" class="clusters-list">
-      <div class="modal-loading">Scanning for duplicates...</div>
-    </div>
+    <div id="clusters-list" class="clusters-list"></div>
   </div>
 
   <div class="table-wrap" id="view-table">
@@ -359,17 +355,17 @@
         <tr class="header-row">
           <th style="width:60px;">ID</th>
           <th>
-            Category
-            <select class="th-filter" id="filter-category" onchange="currentPage=1;loadFeed()">
+            <div class="th-label">Category</div>
+            <select class="th-filter" id="filter-category">
               <option value="">All</option>
               <option value="Official">Official</option>
               <option value="Social Media">Social</option>
               <option value="News">News</option>
             </select>
           </th>
-          <th data-sort="source" onclick="sortBy('source')">
-            Source
-            <select class="th-filter" id="filter-source" onchange="currentPage=1;loadFeed()" onclick="event.stopPropagation()">
+          <th>
+            <div class="th-label" onclick="sortBy('source')">Source &#x25BE;</div>
+            <select class="th-filter" id="filter-source">
               <option value="">All</option>
               <option value="twitter">Twitter</option>
               <option value="news">News</option>
@@ -378,19 +374,19 @@
               <option value="lfb">LFB</option>
             </select>
           </th>
-          <th data-sort="title" onclick="sortBy('title')">Description</th>
-          <th>Location</th>
-          <th>Time</th>
-          <th data-sort="date" onclick="sortBy('date')">Date</th>
+          <th><div class="th-label" onclick="sortBy('title')">Description &#x25BE;</div></th>
+          <th><div class="th-label" onclick="sortBy('location')">Location &#x25BE;</div></th>
+          <th><div class="th-label" onclick="sortBy('time')">Time &#x25BE;</div></th>
+          <th><div class="th-label" onclick="sortBy('date')">Date &#x25BE;</div></th>
           <th>
-            Committed
-            <select class="th-filter" id="filter-status" onchange="currentPage=1;loadFeed()" onclick="event.stopPropagation()">
+            <div class="th-label">Committed</div>
+            <select class="th-filter" id="filter-status">
               <option value="">All</option>
               <option value="uncommitted">No</option>
               <option value="committed">Yes</option>
             </select>
           </th>
-          <th style="width:50px;">Dismiss</th>
+          <th style="width:50px;"><div class="th-label">Dismiss</div></th>
         </tr>
       </thead>
       <tbody id="table-body"></tbody>
@@ -575,6 +571,26 @@ async function loadFeed() {
     const empty = document.getElementById('empty-state');
     if (feedData.length === 0) { empty.classList.remove('hidden'); document.getElementById('view-table').classList.add('hidden'); }
     else { empty.classList.add('hidden'); document.getElementById('view-table').classList.remove('hidden'); }
+
+    // Auto-dedup in background
+    loadClusters();
+  } catch {}
+}
+
+async function loadClusters() {
+  try {
+    const r = await fetch(`${BASE}/api/database/clusters`, FETCH_OPTS);
+    const json = await r.json();
+    if (!json.success) return;
+    clustersData = json.clusters || [];
+    const panel = document.getElementById('clusters-panel');
+    if (clustersData.length > 0) {
+      panel.classList.remove('hidden');
+      document.getElementById('clusters-count').textContent = json.totalClusters + ' clusters · ' + json.totalDuplicates + ' duplicates';
+      renderClusters();
+    } else {
+      panel.classList.add('hidden');
+    }
   } catch {}
 }
 
@@ -1032,40 +1048,17 @@ function renderPagination() {
 }
 function changePage(d) { expandedId = null; currentPage = Math.max(1, currentPage + d); loadFeed(); window.scrollTo({ top: 0, behavior: 'smooth' }); }
 function sortBy(col) {
-  if (currentSort === col) currentOrder = currentOrder === 'ASC' ? 'DESC' : 'ASC';
-  else { currentSort = col; currentOrder = col === 'link_count' ? 'DESC' : 'ASC'; }
+  // Map UI column names to backend sort fields
+  const colMap = { location: 'title', time: 'date' };
+  const sortCol = colMap[col] || col;
+  if (currentSort === sortCol) currentOrder = currentOrder === 'ASC' ? 'DESC' : 'ASC';
+  else { currentSort = sortCol; currentOrder = 'ASC'; }
   currentPage = 1; expandedId = null; loadFeed();
 }
 function refreshAll() { expandedId = null; loadStats(); loadFeed(); }
 
 // ─── Deduplication ───────────────────────────────────
 let clustersData = [];
-let dedupOpen = false;
-
-async function toggleDedup() {
-  dedupOpen = !dedupOpen;
-  const panel = document.getElementById('clusters-panel');
-  const btn = document.getElementById('btn-dedup');
-
-  if (dedupOpen) {
-    panel.classList.remove('hidden');
-    btn.style.background = 'rgba(192,132,252,0.15)';
-    document.getElementById('clusters-list').innerHTML = '<div class="modal-loading">Scanning for duplicates...</div>';
-    try {
-      const r = await fetch(`${BASE}/api/database/clusters`, FETCH_OPTS);
-      const json = await r.json();
-      if (!json.success) throw new Error(json.error);
-      clustersData = json.clusters || [];
-      document.getElementById('clusters-count').textContent = json.totalClusters + ' clusters · ' + json.totalDuplicates + ' duplicates';
-      renderClusters();
-    } catch (err) {
-      document.getElementById('clusters-list').innerHTML = '<div class="modal-loading">Error: ' + escHtml(err.message) + '</div>';
-    }
-  } else {
-    panel.classList.add('hidden');
-    btn.style.background = '';
-  }
-}
 
 function renderClusters() {
   const el = document.getElementById('clusters-list');
@@ -1210,6 +1203,7 @@ function toggleLast24h() {
 // ─── Event Listeners ──────────────────────────────────
 document.getElementById('search').addEventListener('input', () => { clearTimeout(searchTimeout); searchTimeout = setTimeout(() => { currentPage = 1; expandedId = null; loadFeed(); }, 300); });
 document.getElementById('filter-source').addEventListener('change', () => { currentPage = 1; expandedId = null; loadFeed(); });
+document.getElementById('filter-category').addEventListener('change', () => { currentPage = 1; expandedId = null; loadFeed(); });
 document.getElementById('filter-status').addEventListener('change', () => { currentPage = 1; expandedId = null; loadFeed(); });
 document.getElementById('filter-date-from').addEventListener('change', () => { currentPage = 1; expandedId = null; loadFeed(); });
 document.getElementById('filter-date-to').addEventListener('change', () => { currentPage = 1; expandedId = null; loadFeed(); });
