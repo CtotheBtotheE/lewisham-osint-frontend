@@ -325,7 +325,6 @@
           <th>Location</th>
           <th>Time</th>
           <th data-sort="date" onclick="sortBy('date')">Date</th>
-          <th data-sort="max_confidence" onclick="sortBy('max_confidence')">Confidence</th>
           <th style="width:50px;">Dismiss</th>
           <th>Committed</th>
         </tr>
@@ -522,13 +521,12 @@ function renderTable(items) {
       <td style="text-transform:capitalize;">${loc}</td>
       <td style="white-space:nowrap;font-size:11px;color:#94a3b8;">${timeStr}</td>
       <td style="white-space:nowrap;">${freshDot}${dateStr}</td>
-      <td>${confHtml}</td>
       <td><button class="dismiss-btn" onclick="event.stopPropagation(); openDismissModal('${id}', '${src}')" title="Dismiss">&times;</button></td>
       <td>${commitHtml}</td>
     </tr>`;
 
     if (isExpanded) {
-      html += `<tr class="detail-row"><td colspan="10"><div class="detail-panel" id="detail-${id}"><div class="modal-loading">Loading...</div></div></td></tr>`;
+      html += `<tr class="detail-row"><td colspan="9"><div class="detail-panel" id="detail-${id}"><div class="modal-loading">Loading...</div></div></td></tr>`;
     }
   });
 
@@ -918,7 +916,7 @@ function renderPagination() {
 function changePage(d) { expandedId = null; currentPage = Math.max(1, currentPage + d); loadFeed(); window.scrollTo({ top: 0, behavior: 'smooth' }); }
 function sortBy(col) {
   if (currentSort === col) currentOrder = currentOrder === 'ASC' ? 'DESC' : 'ASC';
-  else { currentSort = col; currentOrder = col === 'link_count' || col === 'max_confidence' ? 'DESC' : 'ASC'; }
+  else { currentSort = col; currentOrder = col === 'link_count' ? 'DESC' : 'ASC'; }
   currentPage = 1; expandedId = null; loadFeed();
 }
 function refreshAll() { expandedId = null; loadStats(); loadFeed(); }
@@ -936,8 +934,8 @@ async function exportCsv() {
     const r = await fetch(`${BASE}/api/database/feed?${params}`, FETCH_OPTS);
     const json = await r.json();
     const items = json.data || [];
-    const header = 'Source,Description,Location,Date,Links,Confidence,Committed\n';
-    const rows = items.map(i => `"${i.source}","${(i.title||'').replace(/"/g,'""').slice(0,200)}","${i.location||''}","${i.date||''}",${i.link_count||0},${i.max_confidence?Math.round(i.max_confidence*100)+'%':''},${i.is_committed?'Yes':'No'}`).join('\n');
+    const header = 'Source,Description,Location,Date,Committed\n';
+    const rows = items.map(i => `"${i.source}","${(i.title||'').replace(/"/g,'""').slice(0,200)}","${i.location||''}","${i.date||''}",${i.is_committed?'Yes':'No'}`).join('\n');
     const blob = new Blob([header + rows], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a'); a.href = url; a.download = `lewisham-intel-${new Date().toISOString().slice(0,10)}.csv`; a.click();
