@@ -22,15 +22,6 @@ export default {
       url.pathname = '/database.html';
       return env.ASSETS.fetch(new Request(url.toString(), request));
     }
-    if (path === '/admin/analytics' || path === '/admin/analytics/') {
-      url.pathname = '/analytics.html';
-      return env.ASSETS.fetch(new Request(url.toString(), request));
-    }
-    if (path === '/demo' || path === '/demo/') {
-      url.pathname = '/demo.html';
-      return env.ASSETS.fetch(new Request(url.toString(), request));
-    }
-
     if (MAINTENANCE && !path.startsWith('/admin')) {
       return new Response(MAINTENANCE_HTML, {
         status: 503,
