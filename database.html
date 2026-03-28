@@ -323,6 +323,42 @@
   </div>
 </div>
 
+<div class="modal-overlay" id="event-verify-modal">
+  <div class="modal" style="width:480px;">
+    <div class="modal-header">
+      <h3>Confirm Event</h3>
+      <button class="modal-close" onclick="closeEventVerifyModal()">&times;</button>
+    </div>
+    <div style="padding:16px 20px;">
+      <div id="event-verify-detail" style="font-size:12px;color:#94a3b8;margin-bottom:12px;"></div>
+      <p style="font-size:12px;color:#94a3b8;margin-bottom:4px;">Why is this event confirmed? (helps AI learn)</p>
+      <textarea class="dismiss-textarea" id="event-verify-reason" placeholder="e.g. Confirmed by multiple sources, matches known incident, verified by police report..." onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();confirmEventVerify();}"></textarea>
+      <div style="display:flex;gap:8px;justify-content:flex-end;">
+        <button class="dismiss-confirm-btn cancel" onclick="closeEventVerifyModal()">Cancel</button>
+        <button class="dismiss-confirm-btn" style="background:#22c55e;color:#fff;" onclick="confirmEventVerify()">Confirm Event</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="event-dismiss-modal">
+  <div class="modal" style="width:480px;">
+    <div class="modal-header">
+      <h3>Dismiss Event</h3>
+      <button class="modal-close" onclick="closeEventDismissModal()">&times;</button>
+    </div>
+    <div style="padding:16px 20px;">
+      <div id="event-dismiss-detail" style="font-size:12px;color:#94a3b8;margin-bottom:12px;"></div>
+      <p style="font-size:12px;color:#94a3b8;margin-bottom:4px;">Why are you dismissing this event? (helps AI learn)</p>
+      <textarea class="dismiss-textarea" id="event-dismiss-reason" placeholder="e.g. Duplicate event, wrong area, not a real incident, test data..." onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();confirmEventDismiss();}"></textarea>
+      <div style="display:flex;gap:8px;justify-content:flex-end;">
+        <button class="dismiss-confirm-btn cancel" onclick="closeEventDismissModal()">Cancel</button>
+        <button class="dismiss-confirm-btn red" onclick="confirmEventDismiss()">Dismiss Event</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="intel-modal">
   <div class="modal" style="width:680px;">
     <div class="modal-header">
@@ -1287,8 +1323,8 @@ function renderEvents() {
       </div>
       <div class="event-card-actions">
         ${ev.is_verified ? '<span class="event-verified-badge">VERIFIED</span>' :
-          `<button class="event-action-btn verify" onclick="event.stopPropagation();verifyEventDb(${ev.id})">Verify</button>`}
-        <button class="event-action-btn dismiss" onclick="event.stopPropagation();dismissEventDb(${ev.id})">Dismiss</button>
+          `<button class="event-action-btn verify" onclick="event.stopPropagation();openEventVerifyModal(${ev.id})">Verify</button>`}
+        <button class="event-action-btn dismiss" onclick="event.stopPropagation();openEventDismissModal(${ev.id})">Dismiss</button>
       </div>
       <div class="event-sources-list" id="event-sources-${ev.id}"></div>
     </div>`;
@@ -1320,16 +1356,56 @@ async function toggleEventSources(id) {
   } catch { el.innerHTML = '<div style="font-size:11px;color:#ef4444;">Error loading sources</div>'; }
 }
 
-async function verifyEventDb(id) {
+let eventVerifyId = null, eventDismissId = null;
+
+function openEventVerifyModal(id) {
+  eventVerifyId = id;
+  const ev = eventsData.find(e => e.id === id);
+  const detail = document.getElementById('event-verify-detail');
+  if (ev) {
+    detail.innerHTML = `<div style="font-weight:600;color:#e2e8f0;margin-bottom:4px;">${escHtml(ev.title)}</div>
+      <div style="margin-bottom:4px;">${escHtml((ev.summary || '').slice(0, 200))}</div>
+      <div>${ev.source_count} source${ev.source_count !== 1 ? 's' : ''} · ${escHtml(ev.category)} · ${escHtml(ev.area_name || '')}</div>`;
+  }
+  document.getElementById('event-verify-reason').value = '';
+  document.getElementById('event-verify-modal').classList.add('show');
+}
+function closeEventVerifyModal() { document.getElementById('event-verify-modal').classList.remove('show'); eventVerifyId = null; }
+document.getElementById('event-verify-modal').addEventListener('click', (e) => { if (e.target === e.currentTarget) closeEventVerifyModal(); });
+
+async function confirmEventVerify() {
+  if (!eventVerifyId) return;
+  const reason = document.getElementById('event-verify-reason').value.trim();
+  const id = eventVerifyId;
+  closeEventVerifyModal();
   try {
-    await fetch(`${BASE}/api/database/events/${id}/verify`, postOpts());
+    await fetch(`${BASE}/api/database/events/${id}/verify`, postOpts({ reason }));
     loadEvents();
   } catch {}
 }
 
-async function dismissEventDb(id) {
+function openEventDismissModal(id) {
+  eventDismissId = id;
+  const ev = eventsData.find(e => e.id === id);
+  const detail = document.getElementById('event-dismiss-detail');
+  if (ev) {
+    detail.innerHTML = `<div style="font-weight:600;color:#e2e8f0;margin-bottom:4px;">${escHtml(ev.title)}</div>
+      <div style="margin-bottom:4px;">${escHtml((ev.summary || '').slice(0, 200))}</div>
+      <div>${ev.source_count} source${ev.source_count !== 1 ? 's' : ''} · ${escHtml(ev.category)} · ${escHtml(ev.area_name || '')}</div>`;
+  }
+  document.getElementById('event-dismiss-reason').value = '';
+  document.getElementById('event-dismiss-modal').classList.add('show');
+}
+function closeEventDismissModal() { document.getElementById('event-dismiss-modal').classList.remove('show'); eventDismissId = null; }
+document.getElementById('event-dismiss-modal').addEventListener('click', (e) => { if (e.target === e.currentTarget) closeEventDismissModal(); });
+
+async function confirmEventDismiss() {
+  if (!eventDismissId) return;
+  const reason = document.getElementById('event-dismiss-reason').value.trim();
+  const id = eventDismissId;
+  closeEventDismissModal();
   try {
-    await fetch(`${BASE}/api/database/events/${id}/dismiss`, postOpts({ reason: 'Dismissed from database' }));
+    await fetch(`${BASE}/api/database/events/${id}/dismiss`, postOpts({ reason: reason || 'Dismissed from database' }));
     loadEvents();
   } catch {}
 }
