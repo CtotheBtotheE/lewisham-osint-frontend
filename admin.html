@@ -230,8 +230,6 @@
       font-size: 10px; padding: 3px 9px; border-radius: 5px; cursor: pointer;
       font-weight: 600; border: 1px solid; transition: all 0.15s;
     }
-    .layer-toggle-btn.crime-layer { border-color: #ef4444; color: #f87171; background: rgba(239,68,68,0.15); }
-    .layer-toggle-btn.crime-layer.off { background: transparent; opacity: 0.4; }
     .layer-toggle-btn.live-layer { border-color: #c084fc; color: #c084fc; background: rgba(192,132,252,0.15); }
     .layer-toggle-btn.live-layer.off { background: transparent; opacity: 0.4; }
 
@@ -386,18 +384,6 @@
 
     .leaflet-container { background: #0f1117 !important; }
 
-    .crime-tooltip {
-      background: #1a1d2e;
-      color: #f87171;
-      border: 1px solid #ef4444;
-      border-radius: 4px;
-      font-size: 11px;
-      font-weight: 600;
-      text-transform: capitalize;
-      padding: 3px 8px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.5);
-    }
-    .crime-tooltip::before { border-top-color: #ef4444 !important; }
   </style>
 </head>
 <body>
@@ -422,7 +408,7 @@
 <header>
   <div>
     <h1>Lewisham OSINT Monitor</h1>
-    <p>Live public data — Police · TfL · Twitter · Reddit · News</p>
+    <p>Live public data — TfL · Twitter · Reddit · News</p>
   </div>
   <div style="display:flex;gap:10px;align-items:center;">
     <div class="live-badge">
@@ -441,16 +427,6 @@
 
   <div class="metrics">
     <div class="metric">
-      <div class="metric-label">Police incidents</div>
-      <div class="metric-value" id="m-police">—</div>
-      <div class="metric-sub">Last 30 days · data.police.uk</div>
-    </div>
-    <div class="metric">
-      <div class="metric-label">Top crime type</div>
-      <div class="metric-value" style="font-size:16px;padding-top:5px;" id="m-crime-type">—</div>
-      <div class="metric-sub">By frequency this month</div>
-    </div>
-    <div class="metric">
       <div class="metric-label">TfL disruptions</div>
       <div class="metric-value" id="m-tfl">—</div>
       <div class="metric-sub">DLR · Overground · Bus</div>
@@ -466,9 +442,8 @@
 
     <div class="card">
       <div class="card-header">
-        <h2>Crime map — Lewisham borough</h2>
+        <h2>Intel map — Lewisham borough</h2>
         <div style="display:flex;gap:6px;align-items:center;">
-          <button class="layer-toggle-btn crime-layer" id="toggle-crime" onclick="toggleMapLayer('crime')">Historical Crime</button>
           <button class="layer-toggle-btn live-layer" id="toggle-live" onclick="toggleMapLayer('live')">Live Intel</button>
           <span style="font-size:11px;color:#475569;" id="map-count"></span>
         </div>
@@ -482,7 +457,6 @@
       </div>
       <div class="filter-bar">
         <button class="filter-btn active" onclick="filterFeed('all',this)">All</button>
-        <button class="filter-btn" onclick="filterFeed('crime',this)">Crime</button>
         <button class="filter-btn" onclick="filterFeed('traffic',this)">Traffic</button>
         <button class="filter-btn" onclick="filterFeed('social',this)">Social</button>
         <button class="filter-btn" onclick="filterFeed('news',this)">News</button>
@@ -498,13 +472,6 @@
   </div>
 
   <div class="sources-grid">
-    <div class="source-card">
-      <div class="status-dot dot-warn" id="s-police"></div>
-      <div>
-        <div class="source-name">Met Police API</div>
-        <div class="source-desc" id="sd-police">Connecting...</div>
-      </div>
-    </div>
     <div class="source-card">
       <div class="status-dot dot-warn" id="s-tfl"></div>
       <div>
@@ -552,8 +519,8 @@
 
   const LEWISHAM = { lat: 51.4613, lng: -0.0117 };
   let map, allFeedItems = [];
-  let crimeLayer, liveLayer;
-  let showCrimeLayer = true, showLiveLayer = true;
+  let liveLayer;
+  let showLiveLayer = true;
 
   const AREA_COORDS = {
     'lewisham': [51.4613, -0.0117], 'catford': [51.4530, -0.0220], 'brockley': [51.4740, -0.0260],
@@ -564,11 +531,7 @@
   };
 
   function toggleMapLayer(layer) {
-    if (layer === 'crime') {
-      showCrimeLayer = !showCrimeLayer;
-      document.getElementById('toggle-crime').classList.toggle('off', !showCrimeLayer);
-      if (showCrimeLayer) map.addLayer(crimeLayer); else map.removeLayer(crimeLayer);
-    } else {
+    if (layer === 'live') {
       showLiveLayer = !showLiveLayer;
       document.getElementById('toggle-live').classList.toggle('off', !showLiveLayer);
       if (showLiveLayer) map.addLayer(liveLayer); else map.removeLayer(liveLayer);
@@ -658,7 +621,6 @@
       maxZoom: 19
     }).addTo(map);
 
-    crimeLayer = L.layerGroup().addTo(map);
     liveLayer = L.layerGroup().addTo(map);
 
     fetch('https://mapit.mysociety.org/area/2492.geojson?simplify_tolerance=0.001')
@@ -687,61 +649,6 @@
   }
 
   // ─── Data fetchers ────────────────────────────────────
-
-  async function fetchPolice() {
-    try {
-      const r = await fetch(`${BASE}/api/police`, FETCH_OPTS);
-      if (!r.ok) throw new Error('Backend unavailable');
-      const { data } = await r.json();
-
-      const crimes = data.incidents || [];
-      const usedMonth = data.month || 'recent';
-      const topCategory = (data.topCategory || 'unknown').replace(/-/g, ' ');
-
-      document.getElementById('m-police').textContent = crimes.length.toLocaleString();
-      document.getElementById('m-crime-type').textContent = topCategory;
-      setStatus('s-police', 'sd-police', 'ok', crimes.length + ' incidents loaded (' + usedMonth + ')');
-
-      const CRIME_COLOR = '#ef4444';
-
-      // Dots disabled — re-enable when ready
-      // crimes.forEach(c => {
-      //   const lat = c.lat + (Math.random() - 0.5) * 0.0005;
-      //   const lng = c.lng + (Math.random() - 0.5) * 0.0005;
-      //   const category = (c.category || 'unknown').replace(/-/g, ' ');
-      //   const street = c.street || 'Lewisham';
-      //   const outcome = c.outcome || 'Under investigation';
-      //   L.circleMarker([lat, lng], {
-      //     radius: 5, fillColor: CRIME_COLOR, color: CRIME_COLOR,
-      //     weight: 0.5, fillOpacity: 0.75
-      //   })
-      //   .bindTooltip(category, { direction: 'top', className: 'crime-tooltip' })
-      //   .bindPopup(
-      //     `<b style="text-transform:capitalize">${category}</b><br>` +
-      //     `${street}<br>` +
-      //     `<small>${outcome}</small><br>` +
-      //     `<small>${usedMonth}</small>`
-      //   )
-      //   .addTo(crimeLayer);
-      // });
-
-      document.getElementById('map-count').textContent = crimes.length + ' incidents (' + usedMonth + ') — dots hidden';
-
-      // Live intel disabled — re-enable when ready
-      // loadLiveMapIntel();
-
-      return crimes.slice(0, 25).map(c => ({
-        type:  'crime',
-        title: (c.category || '').replace(/-/g, ' ') + ' — ' + (c.street || 'Lewisham'),
-        meta:  'data.police.uk · ' + usedMonth,
-        time:  Date.now() - Math.random() * 86400000 * 7
-      }));
-    } catch {
-      setStatus('s-police', 'sd-police', 'err', 'API unavailable');
-      document.getElementById('m-police').textContent = 'N/A';
-      return [];
-    }
-  }
 
   async function fetchTfl() {
     try {
@@ -940,10 +847,10 @@
 
   async function loadAll() {
     document.getElementById('m-time').textContent = new Date().toLocaleTimeString('en-GB', { hour:'2-digit', minute:'2-digit' });
-    const [policeItems, tflItems, socialItems, newsItems, twitterItems, roadItems, lfbItems] = await Promise.all([
-      fetchPolice(), fetchTfl(), fetchSocial(), fetchNews(), fetchTwitter(), fetchTflRoads(), fetchLfb()
+    const [tflItems, socialItems, newsItems, twitterItems, roadItems, lfbItems] = await Promise.all([
+      fetchTfl(), fetchSocial(), fetchNews(), fetchTwitter(), fetchTflRoads(), fetchLfb()
     ]);
-    buildFeed([...policeItems, ...tflItems, ...socialItems, ...newsItems, ...twitterItems, ...roadItems, ...lfbItems]);
+    buildFeed([...tflItems, ...socialItems, ...newsItems, ...twitterItems, ...roadItems, ...lfbItems]);
   }
 
   // ─── Init ─────────────────────────────────────────────

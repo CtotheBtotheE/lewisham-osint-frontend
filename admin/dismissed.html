@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Lewisham OSINT — Dismissed Items</title>
+  <meta name="robots" content="noindex, nofollow" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0f1117; color: #e2e8f0; min-height: 100vh; }
+
+    .login-overlay { position: fixed; inset: 0; z-index: 9999; background: #0f1117; display: flex; align-items: center; justify-content: center; }
+    .login-overlay.hidden { display: none; }
+    .login-box { background: #1a1d2e; border: 1px solid #2d3148; border-radius: 12px; padding: 32px; width: 360px; max-width: 90vw; }
+    .login-box h2 { font-size: 18px; font-weight: 600; color: #fff; margin-bottom: 4px; }
+    .login-box p { font-size: 12px; color: #64748b; margin-bottom: 20px; }
+    .login-box label { display: block; font-size: 11px; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 5px; }
+    .login-box input { width: 100%; padding: 10px 12px; border: 1px solid #2d3148; border-radius: 6px; background: #0f1117; color: #e2e8f0; font-size: 14px; margin-bottom: 14px; outline: none; }
+    .login-box input:focus { border-color: #3b82f6; }
+    .login-btn { width: 100%; padding: 10px; border: none; border-radius: 6px; background: #3b82f6; color: #fff; font-size: 14px; font-weight: 600; cursor: pointer; }
+    .login-btn:hover { background: #2563eb; }
+    .login-error { font-size: 12px; color: #f87171; margin-top: 10px; text-align: center; display: none; }
+    .login-error.show { display: block; }
+
+    header { background: #1a1d2e; border-bottom: 1px solid #2d3148; padding: 14px 24px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 1000; }
+    header h1 { font-size: 18px; font-weight: 600; color: #fff; letter-spacing: -0.3px; }
+    header p { font-size: 12px; color: #64748b; margin-top: 2px; }
+    .header-actions { display: flex; gap: 8px; align-items: center; }
+    .nav-btn, .logout-btn { font-size: 11px; padding: 5px 12px; border: 1px solid #2d3148; border-radius: 6px; background: transparent; color: #64748b; cursor: pointer; text-decoration: none; }
+    .nav-btn:hover { color: #94a3b8; border-color: #3d4268; }
+    .logout-btn { border-color: #ef4444; color: #f87171; }
+    .logout-btn:hover { background: rgba(239,68,68,0.1); }
+
+    .container { max-width: 1400px; margin: 0 auto; padding: 20px 24px; }
+    .count-bar { font-size: 12px; color: #64748b; margin-bottom: 12px; }
+
+    .table-wrap { background: #1a1d2e; border: 1px solid #2d3148; border-radius: 10px; overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; }
+    thead th { padding: 10px 12px; font-size: 11px; font-weight: 500; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; text-align: left; border-bottom: 1px solid #2d3148; white-space: nowrap; }
+    tbody td { padding: 10px 12px; font-size: 12px; color: #cbd5e1; border-bottom: 1px solid #1e2235; }
+    tbody tr:hover { background: #1e2235; }
+
+    .source-badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: 600; text-transform: uppercase; }
+    .source-badge.twitter { background: rgba(59,130,246,0.15); color: #60a5fa; }
+    .source-badge.news { background: rgba(74,222,128,0.15); color: #4ade80; }
+    .source-badge.telegram { background: rgba(192,132,252,0.15); color: #c084fc; }
+    .source-badge.road { background: rgba(251,191,36,0.15); color: #fbbf24; }
+    .source-badge.lfb { background: rgba(249,115,22,0.15); color: #f97316; }
+
+    .reason-cell { max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #94a3b8; font-style: italic; }
+    .desc-cell { max-width: 350px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .src-link { color: #64748b; text-decoration: none; font-size: 12px; margin-left: 4px; }
+    .src-link:hover { color: #3b82f6; }
+
+    .restore-btn { padding: 3px 10px; border: 1px solid #3b82f6; border-radius: 4px; background: transparent; color: #60a5fa; font-size: 10px; font-weight: 600; cursor: pointer; transition: all 0.15s; }
+    .restore-btn:hover { background: rgba(59,130,246,0.15); }
+    .restore-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+
+    .empty-state { text-align: center; padding: 60px 20px; color: #475569; font-size: 14px; }
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+
+<div class="login-overlay" id="login-overlay">
+  <div class="login-box">
+    <h2>Admin Login</h2>
+    <p>Lewisham OSINT — authorised access only</p>
+    <form id="login-form" autocomplete="off">
+      <label for="password">Password</label>
+      <input type="password" id="password" placeholder="Enter admin password" autocomplete="new-password" required />
+      <label for="totp">Authenticator code</label>
+      <input type="text" id="totp" placeholder="6-digit code" maxlength="6" autocomplete="one-time-code" pattern="[0-9]{6}" inputmode="numeric" required />
+      <button type="submit" class="login-btn" id="login-btn">Sign in</button>
+      <div class="login-error" id="login-error">Invalid credentials.</div>
+    </form>
+  </div>
+</div>
+
+<header>
+  <div>
+    <h1>Dismissed Items</h1>
+    <p>Items removed from the intelligence feed</p>
+  </div>
+  <div class="header-actions">
+    <a href="/admin" class="nav-btn">Dashboard</a>
+    <a href="/admin/database" class="nav-btn">Database</a>
+    <button class="logout-btn" onclick="logout()">Logout</button>
+  </div>
+</header>
+
+<div class="container">
+  <div class="count-bar" id="count-bar"></div>
+
+  <div class="table-wrap" id="view-table">
+    <table>
+      <thead>
+        <tr>
+          <th>Source</th>
+          <th>Description</th>
+          <th>Location</th>
+          <th>Dismissed</th>
+          <th>Reason</th>
+          <th style="width:70px;">Restore</th>
+        </tr>
+      </thead>
+      <tbody id="table-body"></tbody>
+    </table>
+  </div>
+
+  <div class="empty-state hidden" id="empty-state">No dismissed items yet.</div>
+</div>
+
+<script>
+const BASE = 'https://lewisham-osint-backend.onrender.com';
+const FETCH_OPTS = { credentials: 'include' };
+
+function escHtml(s) { const d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML; }
+
+// Auth
+async function checkSession() {
+  try {
+    const r = await fetch(`${BASE}/api/auth/session`, FETCH_OPTS);
+    const data = await r.json();
+    if (data.authenticated) { document.getElementById('login-overlay').classList.add('hidden'); loadDismissed(); }
+  } catch {}
+}
+
+document.getElementById('login-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const errEl = document.getElementById('login-error');
+  errEl.classList.remove('show');
+  try {
+    const r = await fetch(`${BASE}/api/auth/login`, {
+      method: 'POST', credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: document.getElementById('password').value, totp: document.getElementById('totp').value })
+    });
+    const data = await r.json();
+    if (data.success) { document.getElementById('login-overlay').classList.add('hidden'); loadDismissed(); }
+    else { errEl.textContent = data.error || 'Invalid credentials.'; errEl.classList.add('show'); }
+  } catch { errEl.textContent = 'Connection error.'; errEl.classList.add('show'); }
+});
+
+async function logout() {
+  await fetch(`${BASE}/api/auth/logout`, { method: 'POST', credentials: 'include' });
+  location.reload();
+}
+
+// Load dismissed
+async function loadDismissed() {
+  try {
+    const r = await fetch(`${BASE}/api/database/dismissed`, FETCH_OPTS);
+    const json = await r.json();
+    const items = json.data || [];
+
+    document.getElementById('count-bar').textContent = items.length + ' dismissed item' + (items.length !== 1 ? 's' : '');
+
+    if (items.length === 0) {
+      document.getElementById('empty-state').classList.remove('hidden');
+      document.getElementById('view-table').classList.add('hidden');
+      return;
+    }
+
+    const tbody = document.getElementById('table-body');
+    let html = '';
+    items.forEach(item => {
+      const src = item.source || '';
+      const srcLabel = src === 'twitter' ? 'Twitter' : src === 'news' ? 'News' : src === 'telegram' ? 'Telegram' : src === 'road' ? 'TfL Roads' : src === 'lfb' ? 'LFB' : src;
+
+      let srcArrow = '';
+      if (item.url) srcArrow = ` <a href="${escHtml(item.url)}" target="_blank" rel="noopener" class="src-link" title="Open source">&#x2197;</a>`;
+
+      let dateStr = '';
+      if (item.dismissed_at) {
+        try { dateStr = new Date(item.dismissed_at).toLocaleString('en-GB', { day: 'numeric', month: 'short', year: '2-digit', hour: '2-digit', minute: '2-digit' }); } catch {}
+      }
+
+      html += `<tr>
+        <td><span class="source-badge ${escHtml(src)}">${escHtml(srcLabel)}</span>${srcArrow}</td>
+        <td class="desc-cell" title="${escHtml(item.title || '')}">${escHtml((item.title || '').slice(0, 120))}</td>
+        <td style="text-transform:capitalize;">${escHtml(item.location || '—')}</td>
+        <td style="white-space:nowrap;font-size:11px;">${dateStr}</td>
+        <td class="reason-cell" title="${escHtml(item.reason || '')}">${escHtml(item.reason || '—')}</td>
+        <td><button class="restore-btn" onclick="restoreItem('${escHtml(item.id)}','${escHtml(src)}',this)">Restore</button></td>
+      </tr>`;
+    });
+    tbody.innerHTML = html;
+  } catch {}
+}
+
+async function restoreItem(itemId, source, btn) {
+  btn.disabled = true; btn.textContent = '...';
+  try {
+    await fetch(`${BASE}/api/database/restore`, {
+      method: 'POST', credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ itemId, source })
+    });
+    btn.closest('tr').remove();
+    // Update count
+    const rows = document.querySelectorAll('#table-body tr').length;
+    document.getElementById('count-bar').textContent = rows + ' dismissed item' + (rows !== 1 ? 's' : '');
+    if (rows === 0) {
+      document.getElementById('empty-state').classList.remove('hidden');
+      document.getElementById('view-table').classList.add('hidden');
+    }
+  } catch { btn.disabled = false; btn.textContent = 'Restore'; }
+}
+
+checkSession();
+</script>
+</body>
+</html>

@@ -53,13 +53,14 @@
     table { width: 100%; border-collapse: collapse; }
     thead th { padding: 10px 12px; font-size: 11px; font-weight: 500; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; text-align: left; border-bottom: 1px solid #2d3148; cursor: pointer; user-select: none; white-space: nowrap; }
     thead th:hover { color: #94a3b8; }
+    .th-filter { display: block; margin-top: 4px; padding: 3px 4px; border: 1px solid #2d3148; border-radius: 4px; background: #0f1117; color: #94a3b8; font-size: 10px; width: 100%; cursor: pointer; outline: none; }
+    .th-filter:focus { border-color: #3b82f6; }
     thead th.sorted { color: #3b82f6; }
     tbody td { padding: 10px 12px; font-size: 12px; color: #cbd5e1; border-bottom: 1px solid #1e2235; }
     tbody tr:hover { background: #1e2235; }
     tbody tr.expandable { cursor: pointer; }
 
     .source-badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: 600; text-transform: uppercase; }
-    .source-badge.police { background: rgba(239,68,68,0.15); color: #f87171; }
     .source-badge.twitter { background: rgba(59,130,246,0.15); color: #60a5fa; }
     .source-badge.news { background: rgba(74,222,128,0.15); color: #4ade80; }
     .cat-badge { display: inline-block; padding: 2px 7px; border-radius: 4px; font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.03em; }
@@ -287,7 +288,7 @@
 <header>
   <div>
     <h1>Intelligence Database</h1>
-    <p>Unified feed — Police · Twitter · News · all sources</p>
+    <p>Unified feed — Twitter · News · all sources</p>
   </div>
   <div class="header-actions">
     <a href="/admin" class="nav-btn">Dashboard</a>
@@ -301,41 +302,50 @@
 
   <div class="controls">
     <input type="text" class="search-input" id="search" placeholder="Text search across all sources..." />
-    <select class="filter-select" id="filter-source">
-      <option value="">All sources</option>
-      <option value="police">Police</option>
-      <option value="twitter">Twitter</option>
-      <option value="news">News</option>
-      <option value="telegram">Telegram</option>
-    </select>
-    <select class="filter-select" id="filter-links">
-      <option value="">All items</option>
-      <option value="linked">Linked only</option>
-      <option value="unlinked">Unlinked only</option>
-    </select>
-    <select class="filter-select" id="filter-status">
-      <option value="">All statuses</option>
-      <option value="uncommitted">Uncommitted only</option>
-      <option value="committed">Committed only</option>
-    </select>
     <button class="action-btn" id="btn-24h" onclick="toggleLast24h()" style="border-color:#f59e0b;color:#f59e0b;">Last 24h</button>
     <input type="date" class="filter-select" id="filter-date-from" title="From date" />
     <input type="date" class="filter-select" id="filter-date-to" title="To date" />
     <button class="action-btn" onclick="exportCsv()">Export CSV</button>
+    <a href="/admin/dismissed" class="action-btn" style="border-color:#ef4444;color:#f87171;text-decoration:none;">Dismissed</a>
   </div>
 
   <div class="table-wrap" id="view-table">
     <table>
       <thead>
-        <tr>
+        <tr class="header-row">
           <th style="width:60px;">ID</th>
-          <th>Category</th>
-          <th data-sort="source" onclick="sortBy('source')">Source</th>
+          <th>
+            Category
+            <select class="th-filter" id="filter-category" onchange="currentPage=1;loadFeed()">
+              <option value="">All</option>
+              <option value="Official">Official</option>
+              <option value="Social Media">Social</option>
+              <option value="News">News</option>
+            </select>
+          </th>
+          <th data-sort="source" onclick="sortBy('source')">
+            Source
+            <select class="th-filter" id="filter-source" onchange="currentPage=1;loadFeed()" onclick="event.stopPropagation()">
+              <option value="">All</option>
+              <option value="twitter">Twitter</option>
+              <option value="news">News</option>
+              <option value="telegram">Telegram</option>
+              <option value="road">TfL Roads</option>
+              <option value="lfb">LFB</option>
+            </select>
+          </th>
           <th data-sort="title" onclick="sortBy('title')">Description</th>
           <th>Location</th>
           <th>Time</th>
           <th data-sort="date" onclick="sortBy('date')">Date</th>
-          <th>Committed</th>
+          <th>
+            Committed
+            <select class="th-filter" id="filter-status" onchange="currentPage=1;loadFeed()" onclick="event.stopPropagation()">
+              <option value="">All</option>
+              <option value="uncommitted">No</option>
+              <option value="committed">Yes</option>
+            </select>
+          </th>
           <th style="width:50px;">Dismiss</th>
         </tr>
       </thead>
@@ -489,15 +499,14 @@ async function loadStats() {}
 async function loadFeed() {
   const search = document.getElementById('search').value;
   const source = document.getElementById('filter-source').value;
-  const linkStatus = document.getElementById('filter-links').value;
   const dateFrom = document.getElementById('filter-date-from').value;
   const dateTo = document.getElementById('filter-date-to').value;
   const params = new URLSearchParams({ page: currentPage, limit: LIMIT, sort: currentSort, order: currentOrder });
   if (search) params.set('search', search);
   if (source) params.set('source', source);
-  if (linkStatus) params.set('linkStatus', linkStatus);
   if (dateFrom) params.set('dateFrom', dateFrom);
   if (dateTo) params.set('dateTo', dateTo);
+  params.set('excludeDismissed', 'true');
 
   try {
     const r = await fetch(`${BASE}/api/database/feed?${params}`, FETCH_OPTS);
@@ -509,6 +518,13 @@ async function loadFeed() {
     const statusFilter = document.getElementById('filter-status').value;
     if (statusFilter === 'committed') feedData = feedData.filter(i => i.is_committed);
     else if (statusFilter === 'uncommitted') feedData = feedData.filter(i => !i.is_committed);
+
+    // Client-side category filter
+    const catFilter = document.getElementById('filter-category').value;
+    if (catFilter) {
+      const catMap = { police: 'Official', twitter: 'Social Media', telegram: 'Social Media', bluesky: 'Social Media', road: 'Official', lfb: 'Official', news: 'News' };
+      feedData = feedData.filter(i => (catMap[i.source] || 'Other') === catFilter);
+    }
 
     renderTable(feedData);
     renderPagination();
@@ -530,7 +546,7 @@ function renderTable(items) {
     // Source — show exact website/platform
     let srcLabel = src;
     let category = 'Other';
-    if (src === 'police') { srcLabel = 'Met Police'; category = 'Official'; }
+    if (src === 'police') { srcLabel = 'Police'; category = 'Official'; } // legacy
     else if (src === 'twitter') { srcLabel = 'X / Twitter'; category = 'Social Media'; }
     else if (src === 'telegram') { srcLabel = 'Telegram'; category = 'Social Media'; }
     else if (src === 'bluesky') { srcLabel = 'Bluesky'; category = 'Social Media'; }
@@ -663,64 +679,11 @@ async function loadDetail(id, source) {
   const panel = document.getElementById('detail-' + id);
   if (!panel) return;
 
-  if (source === 'police') {
-    try {
-      const r = await fetch(`${BASE}/api/database/crimes/${encodeURIComponent(id)}/links`, FETCH_OPTS);
-      if (!r.ok) { panel.innerHTML = `<div class="no-links">Error ${r.status}: ${r.statusText}</div>`; return; }
-      const json = await r.json();
-      renderPoliceDetail(panel, id, json.data || { tweets: [], articles: [] });
-    } catch (err) { panel.innerHTML = `<div class="no-links">Failed to load: ${err.message}</div>`; }
-  } else if (source === 'twitter') {
+  if (source === 'twitter') {
     panel.innerHTML = '<div class="no-links">Tweet detail — linked to crimes via the correlation engine. Use "Run Correlation" to update links.</div>';
   } else {
     panel.innerHTML = '<div class="no-links">Article detail — linked to crimes via the correlation engine. Use "Run Correlation" to update links.</div>';
   }
-}
-
-function renderPoliceDetail(panel, persistentId, data) {
-  let html = '';
-
-  // Committed summary if exists
-  const item = feedData.find(i => i.id === persistentId && i.source === 'police');
-  if (item && item.committed_summary) {
-    html += '<div class="detail-section">';
-    html += '<div class="detail-section-title summary">INTELLIGENCE SUMMARY</div>';
-    html += `<div class="summary-box">${escHtml(item.committed_summary)}</div>`;
-    html += '</div>';
-  }
-
-  // Tweets
-  html += '<div class="detail-section">';
-  html += `<div class="detail-section-title tweets">LINKED TWEETS (${data.tweets.length})</div>`;
-  if (data.tweets.length === 0) html += '<div class="no-links">No linked tweets</div>';
-  else data.tweets.forEach(t => {
-    const badge = t.match_type === 'manual' ? '<span class="confidence-badge manual">Manual</span>' : `<span class="confidence-badge auto">${Math.round((t.confidence||0)*100)}% auto</span>`;
-    html += `<div class="linked-item"><div class="linked-item-content">
-      <a href="${escHtml(t.tweet_url)}" target="_blank" rel="noopener">@${escHtml(t.author_username)}</a> ${badge}
-      <div class="linked-item-meta">${t.created_at ? new Date(t.created_at).toLocaleString('en-GB') : ''}</div>
-      <div class="linked-item-text">${escHtml((t.text||'').slice(0,200))}</div>
-    </div><button class="remove-link-btn" onclick="event.stopPropagation();removeLink('${escHtml(persistentId)}',${t.link_id})">Remove</button></div>`;
-  });
-  html += `<button class="add-link-btn" onclick="event.stopPropagation();openModal('${escHtml(persistentId)}','tweet')">+ Link tweet</button></div>`;
-
-  // Articles
-  html += '<div class="detail-section">';
-  html += `<div class="detail-section-title articles">LINKED ARTICLES (${data.articles.length})</div>`;
-  if (data.articles.length === 0) html += '<div class="no-links">No linked articles</div>';
-  else data.articles.forEach(a => {
-    const badge = a.match_type === 'manual' ? '<span class="confidence-badge manual">Manual</span>' : `<span class="confidence-badge auto">${Math.round((a.confidence||0)*100)}% auto</span>`;
-    html += `<div class="linked-item"><div class="linked-item-content">
-      <a href="${escHtml(a.url)}" target="_blank" rel="noopener">${escHtml((a.title||'').slice(0,120))}</a> ${badge}
-      <div class="linked-item-meta">${escHtml(a.source||'')} · ${a.published_at ? new Date(a.published_at).toLocaleDateString('en-GB') : ''}</div>
-    </div><button class="remove-link-btn" onclick="event.stopPropagation();removeLink('${escHtml(persistentId)}',${a.link_id})">Remove</button></div>`;
-  });
-  html += `<button class="add-link-btn" onclick="event.stopPropagation();openModal('${escHtml(persistentId)}','article')">+ Link article</button></div>`;
-
-  panel.innerHTML = html;
-}
-
-async function removeLink(pid, linkId) {
-  try { await fetch(`${BASE}/api/database/links/${linkId}`, { method: 'DELETE', credentials: 'include' }); loadDetail(pid, 'police'); loadStats(); } catch {}
 }
 
 // ─── Commit/Uncommit ──────────────────────────────────
@@ -1035,11 +998,9 @@ function refreshAll() { expandedId = null; loadStats(); loadFeed(); }
 async function exportCsv() {
   const search = document.getElementById('search').value;
   const source = document.getElementById('filter-source').value;
-  const linkStatus = document.getElementById('filter-links').value;
   const params = new URLSearchParams({ page: 1, limit: 10000, sort: currentSort, order: currentOrder });
   if (search) params.set('search', search);
   if (source) params.set('source', source);
-  if (linkStatus) params.set('linkStatus', linkStatus);
   try {
     const r = await fetch(`${BASE}/api/database/feed?${params}`, FETCH_OPTS);
     const json = await r.json();
@@ -1077,7 +1038,6 @@ function toggleLast24h() {
 // ─── Event Listeners ──────────────────────────────────
 document.getElementById('search').addEventListener('input', () => { clearTimeout(searchTimeout); searchTimeout = setTimeout(() => { currentPage = 1; expandedId = null; loadFeed(); }, 300); });
 document.getElementById('filter-source').addEventListener('change', () => { currentPage = 1; expandedId = null; loadFeed(); });
-document.getElementById('filter-links').addEventListener('change', () => { currentPage = 1; expandedId = null; loadFeed(); });
 document.getElementById('filter-status').addEventListener('change', () => { currentPage = 1; expandedId = null; loadFeed(); });
 document.getElementById('filter-date-from').addEventListener('change', () => { currentPage = 1; expandedId = null; loadFeed(); });
 document.getElementById('filter-date-to').addEventListener('change', () => { currentPage = 1; expandedId = null; loadFeed(); });
