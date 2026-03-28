@@ -236,32 +236,7 @@
       height: 100%;
     }
 
-    .filter-bar {
-      display: flex;
-      gap: 6px;
-      padding: 10px 14px;
-      border-bottom: 1px solid #2d3148;
-      flex-wrap: wrap;
-    }
 
-    .filter-btn {
-      font-size: 11px;
-      padding: 4px 10px;
-      border-radius: 20px;
-      border: 1px solid #2d3148;
-      background: transparent;
-      color: #64748b;
-      cursor: pointer;
-      transition: all 0.15s;
-    }
-
-    .filter-btn:hover { border-color: #475569; color: #94a3b8; }
-
-    .filter-btn.active {
-      background: #2d3148;
-      color: #e2e8f0;
-      border-color: #3d4268;
-    }
 
     .feed-list {
       overflow-y: auto;
@@ -454,19 +429,10 @@
 
     <div class="card feed-wrap">
       <div class="card-header">
-        <h2>Live event feed</h2>
-      </div>
-      <div class="filter-bar">
-        <button class="filter-btn active" onclick="filterFeed('all',this)">All</button>
-        <button class="filter-btn" onclick="filterFeed('traffic',this)">Traffic</button>
-        <button class="filter-btn" onclick="filterFeed('social',this)">Social</button>
-        <button class="filter-btn" onclick="filterFeed('news',this)">News</button>
-        <button class="filter-btn" onclick="filterFeed('twitter',this)">Twitter</button>
-        <button class="filter-btn" onclick="filterFeed('road',this)">Roads</button>
-        <button class="filter-btn" onclick="filterFeed('lfb',this)">LFB</button>
+        <h2>Confirmed events</h2>
       </div>
       <div class="feed-list" id="feed-list">
-        <div class="loading-msg">Loading feed...</div>
+        <div class="loading-msg">Loading events...</div>
       </div>
     </div>
 
@@ -527,7 +493,7 @@
   }
 
   const LEWISHAM = { lat: 51.4613, lng: -0.0117 };
-  let map, allFeedItems = [];
+  let map;
   let eventsLayer;
 
   async function checkSession() {
@@ -637,135 +603,43 @@
       });
   }
 
-  async function fetchTfl() {
-    try {
-      const r = await fetch(`${BASE}/api/tfl`, FETCH_OPTS);
-      if (!r.ok) throw new Error();
-      const { data } = await r.json();
-      const count = data.total || 0;
-      document.getElementById('m-tfl').textContent = count;
-      setStatus('s-tfl', 'sd-tfl', 'ok', count ? count + ' disruptions' : 'No disruptions');
-      return (data.disruptions || []).map(d => ({
-        type:  'traffic',
-        title: (d.description || d.summary || 'TfL disruption near Lewisham').slice(0, 100),
-        meta:  'TfL · ' + (d.timeAgo || 'Now'),
-        time:  new Date(d.created || Date.now()).getTime()
-      }));
-    } catch {
-      setStatus('s-tfl', 'sd-tfl', 'err', 'API unavailable');
-      document.getElementById('m-tfl').textContent = 'N/A';
-      return [];
-    }
-  }
-
-  async function fetchSocial() {
-    try {
-      const r = await fetch(`${BASE}/api/reddit`, FETCH_OPTS);
-      if (!r.ok) throw new Error();
-      const { data } = await r.json();
-      const posts = data.posts || [];
-      setStatus('s-reddit', 'sd-reddit', 'ok', posts.length + ' posts fetched');
-      return posts.map(p => ({
-        type:  'social',
-        title: p.title,
-        meta:  'r/' + p.subreddit + ' · ' + (p.timeAgo || ''),
-        time:  new Date(p.created || Date.now()).getTime(),
-        url:   p.url
-      }));
-    } catch {
-      setStatus('s-reddit', 'sd-reddit', 'warn', 'Proxy error — using fallback');
-      return [
-        { type:'social', title:'Road closure near Lewisham High St', meta:'r/Lewisham · 2h ago', time: Date.now()-7200000 },
-        { type:'social', title:'Anyone know what happened on Loampit Vale?', meta:'r/Lewisham · 5h ago', time: Date.now()-18000000 }
-      ];
-    }
-  }
-
-  async function fetchNews() {
-    try {
-      const r = await fetch(`${BASE}/api/news`, FETCH_OPTS);
-      if (!r.ok) throw new Error();
-      const { data } = await r.json();
-      return (data.articles || []).map(a => ({
-        type:  'news',
-        title: a.title,
-        meta:  (a.source || 'News') + ' · ' + (a.timeAgo || ''),
-        time:  new Date(a.published || Date.now()).getTime(),
-        url:   a.url
-      }));
-    } catch { return []; }
-  }
-
-  function buildFeed(items) {
-    allFeedItems = items.sort((a, b) => (b.time || 0) - (a.time || 0));
-    renderFeed('all');
-  }
-
-  function renderFeed(filter) {
-    const list  = document.getElementById('feed-list');
-    const items = filter === 'all' ? allFeedItems : allFeedItems.filter(i => i.type === filter);
-    if (!items.length) {
-      list.innerHTML = '<div class="loading-msg">No items for this filter.</div>';
-      return;
-    }
-    list.innerHTML = items.slice(0, 40).map(item => {
-      const badge = { crime:'badge-crime', traffic:'badge-traffic', social:'badge-social', news:'badge-news', air:'badge-air' }[item.type] || 'badge-social';
-      const safeUrl = item.url ? escHtmlMap(item.url) : '';
-      const click = safeUrl ? `onclick="window.open('${safeUrl}','_blank')" style="cursor:pointer;"` : '';
-      return `<div class="feed-item" ${click}>
-        <span class="feed-badge ${badge}">${escHtmlMap(item.type)}</span>
-        <div class="feed-content">
-          <div class="feed-title">${escHtmlMap(item.title)}</div>
-          <div class="feed-meta">${escHtmlMap(item.meta)}</div>
-        </div>
-      </div>`;
-    }).join('');
-  }
-
-  function filterFeed(type, btn) {
-    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    renderFeed(type);
-  }
-
-  async function fetchTflRoads() {
-    try {
-      const r = await fetch(`${BASE}/api/tfl-roads`, FETCH_OPTS);
-      const { data } = await r.json();
-      const disruptions = data.disruptions || [];
-      setStatus('s-tflroads', 'sd-tflroads', 'ok', disruptions.length + ' road incidents');
-      return disruptions.map(d => ({ type: 'road', badge: 'TfL Road', title: d.description?.slice(0,100) || 'Road incident', meta: d.timeAgo || '', url: null, time: new Date(d.created) }));
-    } catch { setStatus('s-tflroads', 'sd-tflroads', 'err', 'Failed'); return []; }
-  }
-
-  async function fetchLfb() {
-    try {
-      const r = await fetch(`${BASE}/api/lfb`, FETCH_OPTS);
-      const { data } = await r.json();
-      const incidents = data.incidents || [];
-      setStatus('s-lfb', 'sd-lfb', 'ok', incidents.length + ' incidents');
-      return incidents.map(i => ({ type: 'lfb', badge: 'LFB', title: i.title || 'Fire incident', meta: i.timeAgo || '', url: i.url, time: new Date(i.date) }));
-    } catch { setStatus('s-lfb', 'sd-lfb', 'err', 'Failed'); return []; }
-  }
-
-  async function fetchTwitter() {
-    try {
-      const r = await fetch(`${BASE}/api/twitter`, FETCH_OPTS);
-      const { data } = await r.json();
-      const tweets = data.tweets || [];
-      if (data.error) {
-        setStatus('s-twitter', 'sd-twitter', 'warn', data.error);
-      } else {
-        setStatus('s-twitter', 'sd-twitter', 'ok', tweets.length + ' tweets fetched');
-      }
-      return tweets.map(t => ({ type: 'twitter', badge: 'Twitter', title: `@${t.author_username}: ${t.text?.slice(0,100)}`, meta: t.timeAgo || '', url: t.tweet_url, time: new Date(t.created_at) }));
-    } catch (err) {
-      setStatus('s-twitter', 'sd-twitter', 'err', 'Failed');
-      return [];
-    }
-  }
-
   function escHtmlMap(s) { const d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML; }
+
+  async function loadFeed() {
+    const list = document.getElementById('feed-list');
+    try {
+      const r = await fetch(`${BASE}/api/events?status=confirmed`, FETCH_OPTS);
+      const json = await r.json();
+      const events = (json.data || []).sort((a, b) => new Date(b.last_updated) - new Date(a.last_updated));
+      if (!events.length) {
+        list.innerHTML = '<div class="loading-msg">No confirmed events yet.</div>';
+        return;
+      }
+      const SEV_BADGE = { critical: 'badge-crime', major: 'badge-traffic', minor: 'badge-social', info: 'badge-news' };
+      list.innerHTML = events.slice(0, 40).map(ev => {
+        const badge = SEV_BADGE[ev.severity] || 'badge-social';
+        const ago = ev.last_updated ? timeAgo(new Date(ev.last_updated)) : '';
+        const sources = ev.source_count ? ev.source_count + ' sources' : '';
+        return `<div class="feed-item">
+          <span class="feed-badge ${badge}">${escHtmlMap(ev.severity || 'info')}</span>
+          <div class="feed-content">
+            <div class="feed-title">${escHtmlMap(ev.title)}</div>
+            <div class="feed-meta">${escHtmlMap(ev.category || '')} · ${escHtmlMap(ev.area_name || '')} · ${sources} · ${ago}</div>
+          </div>
+        </div>`;
+      }).join('');
+    } catch {
+      list.innerHTML = '<div class="loading-msg">Failed to load events.</div>';
+    }
+  }
+
+  function timeAgo(date) {
+    const s = Math.floor((Date.now() - date.getTime()) / 1000);
+    if (s < 60) return 'just now';
+    if (s < 3600) return Math.floor(s / 60) + 'm ago';
+    if (s < 86400) return Math.floor(s / 3600) + 'h ago';
+    return Math.floor(s / 86400) + 'd ago';
+  }
 
   async function loadEventsOnMap() {
     eventsLayer.clearLayers();
@@ -843,10 +717,7 @@
 
   async function loadAll() {
     document.getElementById('m-time').textContent = new Date().toLocaleTimeString('en-GB', { hour:'2-digit', minute:'2-digit' });
-    const [tflItems, socialItems, newsItems, twitterItems, roadItems, lfbItems] = await Promise.all([
-      fetchTfl(), fetchSocial(), fetchNews(), fetchTwitter(), fetchTflRoads(), fetchLfb()
-    ]);
-    buildFeed([...tflItems, ...socialItems, ...newsItems, ...twitterItems, ...roadItems, ...lfbItems]);
+    loadFeed();
     loadEventsOnMap();
     loadPipelineStats();
   }

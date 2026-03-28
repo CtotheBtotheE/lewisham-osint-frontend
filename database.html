@@ -1205,7 +1205,7 @@ function toggleLast24h() {
     const now = new Date();
     const yesterday = new Date(now.getTime() - 86400000);
     document.getElementById('filter-date-from').value = yesterday.toISOString().slice(0, 10);
-    document.getElementById('filter-date-to').value = now.toISOString().slice(0, 10);
+    document.getElementById('filter-date-to').value = new Date(now.getTime() + 86400000).toISOString().slice(0, 10);
     btn.style.background = 'rgba(245,158,11,0.2)';
     btn.style.fontWeight = '700';
   } else {
