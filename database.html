@@ -293,7 +293,7 @@
     </div>
     <div style="padding:16px 20px;">
       <p style="font-size:12px;color:#94a3b8;margin-bottom:4px;">Why are you committing this item? This helps the system learn what's reliable.</p>
-      <textarea class="dismiss-textarea" id="commit-reason" placeholder="e.g. Verified incident, multiple sources confirm, eyewitness account..." style="border-color:#4ade80;"></textarea>
+      <textarea class="dismiss-textarea" id="commit-reason" placeholder="e.g. Verified incident, multiple sources confirm, eyewitness account..." style="border-color:#4ade80;" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();confirmCommit();}"></textarea>
       <div style="display:flex;gap:8px;justify-content:flex-end;">
         <button class="dismiss-confirm-btn cancel" onclick="closeCommitModal()">Cancel</button>
         <button class="dismiss-confirm-btn" style="background:#4ade80;color:#0f1117;" onclick="confirmCommit()">Commit</button>
@@ -330,7 +330,7 @@
     </div>
     <div style="padding:16px 20px;">
       <p style="font-size:12px;color:#94a3b8;margin-bottom:4px;">Why are you dismissing this item?</p>
-      <textarea class="dismiss-textarea" id="dismiss-reason" placeholder="e.g. Duplicate, not relevant, incorrect data..."></textarea>
+      <textarea class="dismiss-textarea" id="dismiss-reason" placeholder="e.g. Duplicate, not relevant, incorrect data..." onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();confirmDismiss();}"></textarea>
       <div style="display:flex;gap:8px;justify-content:flex-end;">
         <button class="dismiss-confirm-btn cancel" onclick="closeDismissModal()">Cancel</button>
         <button class="dismiss-confirm-btn red" onclick="confirmDismiss()">Dismiss</button>

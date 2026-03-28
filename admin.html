@@ -423,6 +423,21 @@
 
   <div class="metrics">
     <div class="metric">
+      <div class="metric-label">Active events</div>
+      <div class="metric-value" id="m-events">—</div>
+      <div class="metric-sub">On the map</div>
+    </div>
+    <div class="metric">
+      <div class="metric-label">AI dismissed</div>
+      <div class="metric-value" id="m-auto-dismissed">—</div>
+      <div class="metric-sub">Auto-filtered</div>
+    </div>
+    <div class="metric">
+      <div class="metric-label">Committed</div>
+      <div class="metric-value" id="m-committed">—</div>
+      <div class="metric-sub">Verified sources</div>
+    </div>
+    <div class="metric">
       <div class="metric-label">TfL disruptions</div>
       <div class="metric-value" id="m-tfl">—</div>
       <div class="metric-sub">DLR · Overground · Bus</div>
@@ -440,8 +455,6 @@
       <div class="card-header">
         <h2>Intel map — Lewisham borough</h2>
         <div style="display:flex;gap:6px;align-items:center;">
-          <button class="layer-toggle-btn events-layer" id="toggle-events" onclick="toggleMapLayer('events')">Events</button>
-          <button class="layer-toggle-btn live-layer" id="toggle-live" onclick="toggleMapLayer('live')">Live Intel</button>
           <span style="font-size:11px;color:#475569;" id="map-count"></span>
         </div>
       </div>
@@ -516,8 +529,7 @@
 
   const LEWISHAM = { lat: 51.4613, lng: -0.0117 };
   let map, allFeedItems = [];
-  let liveLayer, eventsLayer;
-  let showLiveLayer = true, showEventsLayer = true;
+  let eventsLayer;
 
   const AREA_COORDS = {
     'lewisham': [51.4613, -0.0117], 'catford': [51.4530, -0.0220], 'brockley': [51.4740, -0.0260],
@@ -527,17 +539,6 @@
     'mottingham': [51.4340, 0.0380], 'lee green': [51.4480, 0.0060], 'bellingham': [51.4460, -0.0320],
   };
 
-  function toggleMapLayer(layer) {
-    if (layer === 'live') {
-      showLiveLayer = !showLiveLayer;
-      document.getElementById('toggle-live').classList.toggle('off', !showLiveLayer);
-      if (showLiveLayer) map.addLayer(liveLayer); else map.removeLayer(liveLayer);
-    } else if (layer === 'events') {
-      showEventsLayer = !showEventsLayer;
-      document.getElementById('toggle-events').classList.toggle('off', !showEventsLayer);
-      if (showEventsLayer) map.addLayer(eventsLayer); else map.removeLayer(eventsLayer);
-    }
-  }
 
   async function checkSession() {
     try {
@@ -617,7 +618,6 @@
     }).addTo(map);
 
     eventsLayer = L.layerGroup().addTo(map);
-    liveLayer = L.layerGroup().addTo(map);
 
     fetch('https://mapit.mysociety.org/area/2492.geojson?simplify_tolerance=0.001')
       .then(r => r.json())
@@ -838,65 +838,17 @@
     } catch {}
   }
 
-  async function loadLiveMapIntel() {
-    liveLayer.clearLayers();
-    let liveCount = 0;
-    const [twitterRes, newsRes, roadsRes] = await Promise.allSettled([
-      fetch(`${BASE}/api/twitter`, FETCH_OPTS).then(r => r.json()),
-      fetch(`${BASE}/api/news`, FETCH_OPTS).then(r => r.json()),
-      fetch(`${BASE}/api/tfl-roads`, FETCH_OPTS).then(r => r.json()),
-    ]);
-
-    // Tweets
-    if (twitterRes.status === 'fulfilled' && twitterRes.value?.data?.tweets) {
-      twitterRes.value.data.tweets.forEach(t => {
-        const coords = t.lat && t.lng ? [t.lat, t.lng] : (t.area_name && AREA_COORDS[t.area_name]) ? AREA_COORDS[t.area_name] : null;
-        if (!coords) return;
-        const lat = coords[0] + (Math.random() - 0.5) * 0.002;
-        const lng = coords[1] + (Math.random() - 0.5) * 0.002;
-        L.circleMarker([lat, lng], { radius: 5, fillColor: '#c084fc', color: '#c084fc', weight: 0.5, fillOpacity: 0.8 })
-          .bindTooltip('@' + (t.author_username || ''), { direction: 'top', className: 'live-tooltip-admin' })
-          .bindPopup(`<div style="width:240px;padding:10px;"><div style="font-size:10px;color:#c084fc;font-weight:700;">TWEET</div><div style="font-size:11px;color:#cbd5e1;margin-top:4px;">${escHtmlMap((t.text || '').slice(0, 150))}</div></div>`, { maxWidth: 260 })
-          .addTo(liveLayer);
-        liveCount++;
-      });
-    }
-
-    // News
-    if (newsRes.status === 'fulfilled' && newsRes.value?.data?.articles) {
-      newsRes.value.data.articles.forEach(a => {
-        if (!a.area_name || !AREA_COORDS[a.area_name]) return;
-        const coords = AREA_COORDS[a.area_name];
-        L.circleMarker([coords[0] + (Math.random() - 0.5) * 0.002, coords[1] + (Math.random() - 0.5) * 0.002],
-          { radius: 4, fillColor: '#4ade80', color: '#4ade80', weight: 0.5, fillOpacity: 0.7 })
-          .bindTooltip('News', { direction: 'top', className: 'live-tooltip-admin' })
-          .bindPopup(`<div style="width:240px;padding:10px;"><div style="font-size:10px;color:#4ade80;font-weight:700;">NEWS</div><div style="font-size:11px;color:#cbd5e1;margin-top:4px;">${escHtmlMap((a.title || '').slice(0, 120))}</div></div>`, { maxWidth: 260 })
-          .addTo(liveLayer);
-        liveCount++;
-      });
-    }
-
-    // TfL Roads
-    if (roadsRes.status === 'fulfilled' && roadsRes.value?.data?.disruptions) {
-      roadsRes.value.data.disruptions.forEach(d => {
-        let lat = null, lng = null;
-        const locLower = (d.location || d.description || '').toLowerCase();
-        for (const [area, c] of Object.entries(AREA_COORDS)) {
-          if (locLower.includes(area)) { lat = c[0]; lng = c[1]; break; }
-        }
-        if (!lat) return;
-        const sevColor = d.severity === 'Serious' ? '#ef4444' : d.severity === 'Moderate' ? '#facc15' : '#f97316';
-        L.circleMarker([lat + (Math.random() - 0.5) * 0.001, lng + (Math.random() - 0.5) * 0.001],
-          { radius: 6, fillColor: sevColor, color: sevColor, weight: 1, fillOpacity: 0.8 })
-          .bindTooltip('Road: ' + (d.severity || ''), { direction: 'top', className: 'live-tooltip-admin' })
-          .bindPopup(`<div style="width:240px;padding:10px;"><div style="font-size:10px;color:${sevColor};font-weight:700;">ROAD ${escHtmlMap((d.severity || '').toUpperCase())}</div><div style="font-size:11px;color:#cbd5e1;margin-top:4px;">${escHtmlMap((d.description || '').slice(0, 180))}</div></div>`, { maxWidth: 260 })
-          .addTo(liveLayer);
-        liveCount++;
-      });
-    }
-
-    const el = document.getElementById('map-count');
-    if (liveCount > 0) el.textContent = el.textContent.split('|')[0].trim() + ' | ' + liveCount + ' live';
+  async function loadPipelineStats() {
+    try {
+      const r = await fetch(`${BASE}/api/pipeline/stats`, FETCH_OPTS);
+      const json = await r.json();
+      if (json.success && json.stats) {
+        const s = json.stats;
+        document.getElementById('m-events').textContent = s.totalEvents || 0;
+        document.getElementById('m-auto-dismissed').textContent = s.autoDismissed || 0;
+        document.getElementById('m-committed').textContent = s.totalCommitted || 0;
+      }
+    } catch {}
   }
 
   async function loadAll() {
@@ -906,7 +858,7 @@
     ]);
     buildFeed([...tflItems, ...socialItems, ...newsItems, ...twitterItems, ...roadItems, ...lfbItems]);
     loadEventsOnMap();
-    loadLiveMapIntel();
+    loadPipelineStats();
   }
 
   window.addEventListener('load', () => {
