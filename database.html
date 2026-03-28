@@ -98,6 +98,12 @@
     .intel-section-title { font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; margin: 12px 0 8px; }
     .dismiss-btn { background: none; border: none; color: #475569; font-size: 14px; cursor: pointer; padding: 2px 6px; border-radius: 3px; line-height: 1; }
     .dismiss-btn:hover { color: #ef4444; background: rgba(239,68,68,0.15); }
+    .icon-btn { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 4px; cursor: pointer; font-size: 14px; transition: all 0.15s; user-select: none; }
+    .icon-btn.tick { color: #475569; }
+    .icon-btn.tick:hover { color: #4ade80; background: rgba(74,222,128,0.15); }
+    .icon-btn.tick.active { color: #4ade80; background: rgba(74,222,128,0.2); }
+    .icon-btn.cross { color: #475569; }
+    .icon-btn.cross:hover { color: #ef4444; background: rgba(239,68,68,0.15); }
     .dismiss-textarea { width: 100%; padding: 10px; background: #0f1117; border: 1px solid #2d3148; border-radius: 6px; color: #e2e8f0; font-size: 13px; resize: vertical; min-height: 80px; margin: 10px 0; }
     .dismiss-textarea:focus { border-color: #ef4444; outline: none; }
     .dismiss-confirm-btn { padding: 8px 18px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; border: none; }
@@ -506,9 +512,12 @@ function renderTable(items) {
       confHtml = `<span class="conf-badge ${cls} clickable" onclick="event.stopPropagation(); openIntelModal('${id}', '${src}')">${pct}%</span>`;
     }
 
-    // Committed checkbox (all rows)
-    const checked = item.is_committed ? 'checked' : '';
-    const commitHtml = `<input type="checkbox" class="commit-cb" ${checked} onclick="event.stopPropagation(); toggleCommit('${id}', '${src}', this)" />`;
+    // Committed — tick icon
+    const commitCls = item.is_committed ? 'icon-btn tick active' : 'icon-btn tick';
+    const commitHtml = `<span class="${commitCls}" onclick="event.stopPropagation(); toggleCommit('${id}', '${src}', this)" title="Commit">&#10003;</span>`;
+
+    // Dismiss — cross icon
+    const dismissHtml = `<span class="icon-btn cross" onclick="event.stopPropagation(); openDismissModal('${id}', '${src}')" title="Dismiss">&#10005;</span>`;
 
     // Unique ID — short hash
     const shortId = (item.id || '').slice(0, 8).toUpperCase();
@@ -521,8 +530,8 @@ function renderTable(items) {
       <td style="text-transform:capitalize;">${loc}</td>
       <td style="white-space:nowrap;font-size:11px;color:#94a3b8;">${timeStr}</td>
       <td style="white-space:nowrap;">${freshDot}${dateStr}</td>
-      <td>${commitHtml}</td>
-      <td><button class="dismiss-btn" onclick="event.stopPropagation(); openDismissModal('${id}', '${src}')" title="Dismiss">&times;</button></td>
+      <td style="text-align:center;">${commitHtml}</td>
+      <td style="text-align:center;">${dismissHtml}</td>
     </tr>`;
 
     if (isExpanded) {
@@ -617,40 +626,40 @@ async function removeLink(pid, linkId) {
 // ─── Commit/Uncommit ──────────────────────────────────
 let commitItemId = null, commitSource = null, commitCb = null;
 
-function toggleCommit(itemId, source, cb) {
-  if (cb.checked) {
+function toggleCommit(itemId, source, el) {
+  const isActive = el.classList.contains('active');
+  if (!isActive) {
     // Committing — open modal for reason
-    commitItemId = itemId; commitSource = source; commitCb = cb;
+    commitItemId = itemId; commitSource = source; commitCb = el;
     document.getElementById('commit-reason').value = '';
     document.getElementById('commit-modal').classList.add('show');
   } else {
     // Uncommitting — do directly
-    doCommitAction(itemId, source, 'uncommit', cb);
+    doCommitAction(itemId, source, 'uncommit', el);
   }
 }
 
 function closeCommitModal() {
   document.getElementById('commit-modal').classList.remove('show');
-  if (commitCb) { commitCb.checked = false; } // Revert checkbox only on cancel
+  // Don't toggle — user cancelled
   commitItemId = null; commitSource = null; commitCb = null;
 }
 function hideCommitModal() {
   document.getElementById('commit-modal').classList.remove('show');
-  // Don't revert checkbox — commit is proceeding
 }
 document.getElementById('commit-modal').addEventListener('click', (e) => { if (e.target === e.currentTarget) closeCommitModal(); });
 
 async function confirmCommit() {
   if (!commitItemId || !commitCb) return;
   const reason = document.getElementById('commit-reason').value.trim();
-  const cb = commitCb, id = commitItemId, src = commitSource;
+  const el = commitCb, id = commitItemId, src = commitSource;
   hideCommitModal();
   commitItemId = null; commitSource = null; commitCb = null;
-  await doCommitAction(id, src, 'commit', cb, reason);
+  await doCommitAction(id, src, 'commit', el, reason);
 }
 
-async function doCommitAction(itemId, source, action, cb, reason) {
-  cb.disabled = true;
+async function doCommitAction(itemId, source, action, el, reason) {
+  el.style.pointerEvents = 'none'; el.style.opacity = '0.4';
   try {
     const r = await fetch(`${BASE}/api/database/crimes/${encodeURIComponent(itemId)}/${action}`, {
       method: 'POST', credentials: 'include',
@@ -658,18 +667,19 @@ async function doCommitAction(itemId, source, action, cb, reason) {
       body: JSON.stringify({ source, reason })
     });
     const json = await r.json();
-    if (!json.success) { cb.checked = !cb.checked; }
-    else {
+    if (json.success) {
+      const nowCommitted = action === 'commit';
+      el.classList.toggle('active', nowCommitted);
       const item = feedData.find(i => i.id === itemId && i.source === source);
       if (item) {
-        item.is_committed = cb.checked;
+        item.is_committed = nowCommitted;
         if (json.summary) item.committed_summary = json.summary;
         else item.committed_summary = null;
       }
       if (expandedId === itemId) loadDetail(itemId, source);
     }
-  } catch { cb.checked = !cb.checked; }
-  cb.disabled = false;
+  } catch {}
+  el.style.pointerEvents = ''; el.style.opacity = '';
 }
 
 // ─── Link Modal ───────────────────────────────────────
