@@ -129,7 +129,6 @@
     </div>
   </div>
 
-  <!-- AI Intelligence Section -->
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;">
     <div style="background:#1a1d2e;border:1px solid #2d3148;border-radius:10px;padding:16px;">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
@@ -159,7 +158,6 @@ const FETCH_OPTS = { credentials: 'include' };
 const CHART_COLORS = ['#ef4444','#3b82f6','#4ade80','#facc15','#c084fc','#f97316','#22d3ee','#f87171','#a78bfa','#34d399','#fbbf24','#fb7185'];
 const chartInstances = {};
 
-// ─── Auth ─────────────────────────────────────────────
 async function checkSession() {
   try {
     const r = await fetch(`${BASE}/api/auth/session`, FETCH_OPTS);
@@ -187,7 +185,6 @@ async function logout() {
   document.getElementById('login-overlay').classList.remove('hidden');
 }
 
-// ─── Dates ────────────────────────────────────────────
 function initDates() {
   const now = new Date();
   const threeMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 3, 1);
@@ -195,7 +192,6 @@ function initDates() {
   document.getElementById('date-to').value = now.toISOString().slice(0, 10);
 }
 
-// ─── Load analytics ───────────────────────────────────
 async function loadAnalytics() {
   const dateFrom = document.getElementById('date-from').value;
   const dateTo = document.getElementById('date-to').value;
@@ -209,8 +205,6 @@ async function loadAnalytics() {
     if (!json.success) return;
     const d = json.data;
 
-    // Stats
-    // police stat removed
     document.getElementById('s-tweets').textContent = (d.sourceBreakdown?.twitter || 0).toLocaleString();
     document.getElementById('s-articles').textContent = (d.sourceBreakdown?.news || 0).toLocaleString();
     document.getElementById('s-area').textContent = d.topAreas?.[0]?.name || '—';
@@ -223,7 +217,6 @@ async function loadAnalytics() {
   } catch {}
 }
 
-// ─── Chart renderers ──────────────────────────────────
 function destroyChart(id) {
   if (chartInstances[id]) { chartInstances[id].destroy(); delete chartInstances[id]; }
 }
@@ -312,7 +305,6 @@ function renderLineChart(canvasId, data) {
   });
 }
 
-// ─── AI Briefing ──────────────────────────────────────
 async function loadBriefing() {
   const el = document.getElementById('briefing-content');
   el.textContent = 'Generating intelligence briefing...';
@@ -328,7 +320,6 @@ async function loadBriefing() {
   } catch { el.textContent = 'Failed to generate briefing'; }
 }
 
-// ─── AI Pattern Analysis ──────────────────────────────
 async function loadPatterns() {
   const el = document.getElementById('patterns-content');
   el.textContent = 'Analyzing patterns...';

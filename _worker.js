@@ -1,13 +1,3 @@
-/**
- * Cloudflare Pages Worker — path-based routing
- *
- * /admin → admin.html
- * /admin/database → database.html
- * /admin/analytics → analytics.html
- * / → maintenance page (when MAINTENANCE = true) or index.html
- */
-
-// ── Set to false when ready to go live ──
 const MAINTENANCE = true;
 
 const MAINTENANCE_HTML = `<!DOCTYPE html>
@@ -24,7 +14,6 @@ export default {
     const url = new URL(request.url);
     const path = url.pathname;
 
-    // Admin routes always work (even in maintenance mode)
     if (path === '/admin' || path === '/admin/') {
       url.pathname = '/admin.html';
       return env.ASSETS.fetch(new Request(url.toString(), request));
@@ -42,7 +31,6 @@ export default {
       return env.ASSETS.fetch(new Request(url.toString(), request));
     }
 
-    // Maintenance mode — block all non-admin pages (demo is allowed above)
     if (MAINTENANCE && !path.startsWith('/admin')) {
       return new Response(MAINTENANCE_HTML, {
         status: 503,
@@ -54,13 +42,11 @@ export default {
       });
     }
 
-    // Serve public site at root
     if (path === '/' || path === '') {
       url.pathname = '/_public.html';
       return env.ASSETS.fetch(new Request(url.toString(), request));
     }
 
-    // Default: static asset serving
     return env.ASSETS.fetch(request);
   },
 };

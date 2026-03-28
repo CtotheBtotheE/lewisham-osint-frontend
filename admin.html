@@ -16,7 +16,6 @@
       min-height: 100vh;
     }
 
-    /* ─── Login overlay ──────────────────────────────────── */
     .login-overlay {
       position: fixed;
       inset: 0;
@@ -103,7 +102,6 @@
 
     .login-error.show { display: block; }
 
-    /* ─── Dashboard styles ───────────────────────────────── */
     header {
       background: #1a1d2e;
       border-bottom: 1px solid #2d3148;
@@ -388,7 +386,6 @@
 </head>
 <body>
 
-<!-- ─── Login Overlay ───────────────────────────────────── -->
 <div class="login-overlay" id="login-overlay">
   <div class="login-box">
     <h2>Admin Login</h2>
@@ -404,7 +401,6 @@
   </div>
 </div>
 
-<!-- ─── Dashboard ───────────────────────────────────────── -->
 <header>
   <div>
     <h1>Lewisham OSINT Monitor</h1>
@@ -538,8 +534,6 @@
     }
   }
 
-  // ─── Auth ──────────────────────────────────────────────
-
   async function checkSession() {
     try {
       const r = await fetch(`${BASE}/api/auth/session`, FETCH_OPTS);
@@ -594,8 +588,6 @@
     document.getElementById('login-overlay').classList.remove('hidden');
   }
 
-  // ─── Helpers ───────────────────────────────────────────
-
   function setStatus(dotId, descId, status, msg) {
     const dot  = document.getElementById(dotId);
     const desc = document.getElementById(descId);
@@ -610,8 +602,6 @@
     if (diff < 86400)return Math.floor(diff / 3600) + 'h ago';
     return Math.floor(diff / 86400) + 'd ago';
   }
-
-  // ─── Map ───────────────────────────────────────────────
 
   function initMap() {
     map = L.map('map', { zoomControl: true, attributionControl: false })
@@ -647,8 +637,6 @@
         }).addTo(map);
       });
   }
-
-  // ─── Data fetchers ────────────────────────────────────
 
   async function fetchTfl() {
     try {
@@ -709,8 +697,6 @@
     } catch { return []; }
   }
 
-  // ─── Feed ─────────────────────────────────────────────
-
   function buildFeed(items) {
     allFeedItems = items.sort((a, b) => (b.time || 0) - (a.time || 0));
     renderFeed('all');
@@ -742,8 +728,6 @@
     renderFeed(type);
   }
 
-  // ─── Load all ─────────────────────────────────────────
-
   async function fetchTflRoads() {
     try {
       const r = await fetch(`${BASE}/api/tfl-roads`, FETCH_OPTS);
@@ -753,7 +737,6 @@
       return disruptions.map(d => ({ type: 'road', badge: 'TfL Road', title: d.description?.slice(0,100) || 'Road incident', meta: d.timeAgo || '', url: null, time: new Date(d.created) }));
     } catch { setStatus('s-tflroads', 'sd-tflroads', 'err', 'Failed'); return []; }
   }
-
 
   async function fetchLfb() {
     try {
@@ -851,9 +834,8 @@
       fetchTfl(), fetchSocial(), fetchNews(), fetchTwitter(), fetchTflRoads(), fetchLfb()
     ]);
     buildFeed([...tflItems, ...socialItems, ...newsItems, ...twitterItems, ...roadItems, ...lfbItems]);
+    loadLiveMapIntel();
   }
-
-  // ─── Init ─────────────────────────────────────────────
 
   window.addEventListener('load', () => {
     checkSession();

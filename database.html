@@ -194,7 +194,6 @@
 
     .desc-cell { max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-transform: capitalize; }
 
-    /* Modal */
     .modal-overlay { position: fixed; inset: 0; z-index: 9998; background: rgba(0,0,0,0.7); display: none; align-items: center; justify-content: center; }
     .modal-overlay.show { display: flex; }
     .modal { background: #1a1d2e; border: 1px solid #2d3148; border-radius: 12px; width: 560px; max-width: 95vw; max-height: 80vh; display: flex; flex-direction: column; }
@@ -417,7 +416,6 @@ let modalCrimeId = null, modalTab = 'tweet', modalPage = 1, modalSearchTimeout =
 
 function escHtml(s) { const d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML; }
 
-// ─── AI Pattern Learning ──────────────────────────────
 async function loadAiPatterns() {
   try {
     const r = await fetch(`${BASE}/api/database/ai-patterns`, FETCH_OPTS);
@@ -504,12 +502,11 @@ function scoreItem(item) {
   }
 }
 
-// ─── Auth ─────────────────────────────────────────────
 async function checkSession() {
   try {
     const r = await fetch(`${BASE}/api/auth/session`, FETCH_OPTS);
     const data = await r.json();
-    if (data.authenticated) { document.getElementById('login-overlay').classList.add('hidden'); loadAiPatterns(); loadStats(); loadFeed(); }
+    if (data.authenticated) { document.getElementById('login-overlay').classList.add('hidden'); loadAiPatterns(); loadFeed(); }
   } catch {}
 }
 
@@ -521,7 +518,7 @@ document.getElementById('login-form').addEventListener('submit', async (e) => {
     const r = await fetch(`${BASE}/api/auth/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
       body: JSON.stringify({ password: document.getElementById('password').value, totp: document.getElementById('totp').value }) });
     const data = await r.json();
-    if (data.success) { document.getElementById('login-overlay').classList.add('hidden'); loadStats(); loadFeed(); }
+    if (data.success) { document.getElementById('login-overlay').classList.add('hidden'); loadFeed(); }
     else { errEl.textContent = data.error || 'Invalid credentials.'; errEl.classList.add('show'); }
   } catch { errEl.textContent = 'Connection error.'; errEl.classList.add('show'); }
   btn.disabled = false;
@@ -532,10 +529,6 @@ async function logout() {
   document.getElementById('login-overlay').classList.remove('hidden');
 }
 
-// ─── Stats (moved to analytics page) ─────────────────
-async function loadStats() {}
-
-// ─── Unified Feed ─────────────────────────────────────
 async function loadFeed() {
   const search = document.getElementById('search').value;
   const source = document.getElementById('filter-source').value;
@@ -594,7 +587,6 @@ async function loadClusters() {
   } catch {}
 }
 
-// ─── Render Table ─────────────────────────────────────
 function renderTable(items) {
   const tbody = document.getElementById('table-body');
   let html = '';
@@ -728,7 +720,6 @@ function renderTable(items) {
   if (expandedId) loadDetail(expandedId, expandedSource);
 }
 
-// ─── Detail Panel ─────────────────────────────────────
 function toggleDetail(id, source) {
   if (expandedId === id && expandedSource === source) { expandedId = null; expandedSource = null; }
   else { expandedId = id; expandedSource = source; }
@@ -746,7 +737,6 @@ async function loadDetail(id, source) {
   }
 }
 
-// ─── Commit/Uncommit ──────────────────────────────────
 let commitItemId = null, commitSource = null, commitCb = null;
 
 function toggleCommit(itemId, source, el) {
@@ -805,7 +795,6 @@ async function doCommitAction(itemId, source, action, el, reason) {
   el.style.pointerEvents = ''; el.style.opacity = '';
 }
 
-// ─── Link Modal ───────────────────────────────────────
 function openModal(pid, tab) {
   modalCrimeId = pid; modalTab = tab; modalPage = 1;
   document.getElementById('link-modal').classList.add('show');
@@ -860,11 +849,9 @@ async function createLink(crimeId, type, linkedId, btn) {
     await fetch(`${BASE}/api/database/crimes/${encodeURIComponent(crimeId)}/links`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ linked_type: type, linked_id: linkedId }) });
     btn.textContent = 'Linked'; btn.style.color = '#4ade80'; btn.style.borderColor = '#4ade80';
     if (expandedId === crimeId) loadDetail(crimeId, 'police');
-    loadStats();
   } catch { btn.textContent = 'Error'; btn.disabled = false; }
 }
 
-// ─── Dismiss Modal ────────────────────────────────────
 let dismissItemId = null, dismissSource = null;
 function openDismissModal(itemId, source) {
   dismissItemId = itemId; dismissSource = source;
@@ -888,10 +875,8 @@ async function confirmDismiss() {
   } catch (err) { alert('Failed to dismiss: ' + err.message); }
 }
 
-// ─── Intel Modal ──────────────────────────────────────
 function closeIntelModal() { document.getElementById('intel-modal').classList.remove('show'); }
 
-// Intel card verdict tracking
 let pendingVerdicts = {};
 
 function intelCardVerdict(cardId, itemId, source, verdict) {
@@ -1039,7 +1024,6 @@ function renderIntelCard(item) {
   </div>`;
 }
 
-// ─── Pagination/Sort ──────────────────────────────────
 function renderPagination() {
   const tp = Math.ceil(totalRecords / LIMIT) || 1;
   document.getElementById('page-info').textContent = `Showing ${((currentPage-1)*LIMIT)+1}–${Math.min(currentPage*LIMIT,totalRecords)} of ${totalRecords.toLocaleString()}`;
@@ -1055,9 +1039,8 @@ function sortBy(col) {
   else { currentSort = sortCol; currentOrder = 'ASC'; }
   currentPage = 1; expandedId = null; loadFeed();
 }
-function refreshAll() { expandedId = null; loadStats(); loadFeed(); }
+function refreshAll() { expandedId = null; loadFeed(); }
 
-// ─── Deduplication ───────────────────────────────────
 let clustersData = [];
 
 function renderClusters() {
@@ -1154,12 +1137,8 @@ async function dismissAllDuplicates() {
 
   if (btn) { btn.textContent = 'Done'; }
   loadFeed();
-  // Re-scan
-  setTimeout(() => toggleDedup(), 500);
-  setTimeout(() => toggleDedup(), 1000);
 }
 
-// ─── Export CSV ───────────────────────────────────────
 async function exportCsv() {
   const search = document.getElementById('search').value;
   const source = document.getElementById('filter-source').value;
@@ -1179,7 +1158,6 @@ async function exportCsv() {
   } catch {}
 }
 
-// ─── Last 24h Filter ─────────────────────────────────
 let is24hActive = false;
 function toggleLast24h() {
   is24hActive = !is24hActive;
@@ -1200,7 +1178,6 @@ function toggleLast24h() {
   currentPage = 1; expandedId = null; loadFeed();
 }
 
-// ─── Event Listeners ──────────────────────────────────
 document.getElementById('search').addEventListener('input', () => { clearTimeout(searchTimeout); searchTimeout = setTimeout(() => { currentPage = 1; expandedId = null; loadFeed(); }, 300); });
 document.getElementById('filter-source').addEventListener('change', () => { currentPage = 1; expandedId = null; loadFeed(); });
 document.getElementById('filter-category').addEventListener('change', () => { currentPage = 1; expandedId = null; loadFeed(); });
