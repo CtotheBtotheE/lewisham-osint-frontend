@@ -756,6 +756,11 @@
     </div>
   </div>
 
+  <div class="card" style="margin-top:12px;padding:14px;">
+    <div class="chart-header">Trending Keywords</div>
+    <div id="trending-keywords" style="line-height:2;"></div>
+  </div>
+
 </div>
 
 <!-- Toast container -->
@@ -1027,6 +1032,30 @@
       renderBarList('chart-areas', d.areas || [], '#3b82f6');
       renderBarList('chart-sources', d.sources || [], '#c084fc');
     } catch {}
+
+    // Fetch trending keywords from AI patterns
+    try {
+      const kr = await fetch(`${BASE}/api/database/ai-patterns`, FETCH_OPTS);
+      const kj = await kr.json();
+      if (kj.success && kj.data) {
+        const keywords = Object.entries(kj.data.keywordScores || {})
+          .map(([k, v]) => ({ word: k, score: v.commit - v.dismiss }))
+          .sort((a, b) => b.score - a.score)
+          .slice(0, 12);
+        renderTrending(keywords);
+      }
+    } catch {}
+  }
+
+  function renderTrending(keywords) {
+    let el = document.getElementById('trending-keywords');
+    if (!el) return;
+    if (!keywords.length) { el.innerHTML = '<div style="font-size:11px;color:var(--text-muted);">No keyword data yet</div>'; return; }
+    el.innerHTML = keywords.map(k => {
+      const color = k.score > 2 ? '#4ade80' : k.score > 0 ? '#facc15' : '#ef4444';
+      const opacity = Math.min(1, 0.4 + Math.abs(k.score) * 0.1);
+      return `<span style="display:inline-block;padding:3px 8px;margin:2px;border-radius:12px;font-size:10px;background:rgba(${color === '#4ade80' ? '74,222,128' : color === '#facc15' ? '250,204,21' : '239,68,68'},${opacity * 0.15});color:${color};border:1px solid rgba(${color === '#4ade80' ? '74,222,128' : color === '#facc15' ? '250,204,21' : '239,68,68'},0.3);">${k.word}</span>`;
+    }).join('');
   }
 
   function drawDailyChart(data) {

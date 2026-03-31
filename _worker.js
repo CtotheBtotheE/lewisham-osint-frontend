@@ -49,6 +49,14 @@ export default {
       url.pathname = '/event.html';
       return env.ASSETS.fetch(new Request(url.toString(), request));
     }
+    if (path === '/areas' || path === '/areas/') {
+      url.pathname = '/areas.html';
+      return env.ASSETS.fetch(new Request(url.toString(), request));
+    }
+    if (path.startsWith('/area/')) {
+      url.pathname = '/area.html';
+      return env.ASSETS.fetch(new Request(url.toString(), request));
+    }
 
     return env.ASSETS.fetch(request);
   },

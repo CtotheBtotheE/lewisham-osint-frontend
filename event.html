@@ -646,6 +646,37 @@
           throw new Error(json.error || 'Failed to load event.');
         }
         renderEvent(json.data);
+
+        // Load similar events
+        fetch(API_BASE + '/api/events/' + eventId + '/similar')
+          .then(function (simR) { return simR.json(); })
+          .then(function (simJson) {
+            var similar = simJson.data || [];
+            if (similar.length > 0) {
+              var sevColor = { critical:'#ef4444', major:'#f97316', minor:'#facc15', info:'#60a5fa' };
+              var simHtml = '';
+              for (var si = 0; si < similar.length; si++) {
+                var ev = similar[si];
+                var sc = sevColor[ev.severity] || '#60a5fa';
+                simHtml += '<a href="/event/' + esc(ev.id) + '" style="display:flex;padding:12px;border-bottom:1px solid var(--border);text-decoration:none;color:inherit;transition:background 0.15s;" onmouseover="this.style.background=\'var(--bg-card-hover)\'" onmouseout="this.style.background=\'\'">'
+                  + '<div style="width:3px;border-radius:2px;background:' + sc + ';margin-right:12px;flex-shrink:0;"></div>'
+                  + '<div style="flex:1;min-width:0;">'
+                  + '<div style="font-size:13px;font-weight:600;color:var(--text-primary);margin-bottom:2px;">' + esc(ev.title) + '</div>'
+                  + '<div style="font-size:10px;color:var(--text-muted);">' + esc(ev.category) + ' &middot; ' + esc(ev.area_name || '') + ' &middot; ' + (ev.source_count || 0) + ' sources</div>'
+                  + '</div></a>';
+              }
+
+              var simSection = document.createElement('div');
+              simSection.style.background = 'var(--bg-card)';
+              simSection.style.border = '1px solid var(--border)';
+              simSection.style.borderRadius = 'var(--radius-lg)';
+              simSection.style.marginTop = '16px';
+              simSection.style.overflow = 'hidden';
+              simSection.innerHTML = '<div style="padding:16px 16px 8px;"><h2 style="font-size:13px;font-weight:500;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.05em;">Similar Events</h2></div>' + simHtml;
+              document.querySelector('.container').appendChild(simSection);
+            }
+          })
+          .catch(function () { /* silently ignore similar events errors */ });
       })
       .catch(function (err) {
         renderError(err.message);

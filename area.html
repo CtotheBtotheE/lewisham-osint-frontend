@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Area — Lewisham Live</title>
+  <meta name="description" content="Incidents in this area — Lewisham Live crime intelligence platform" />
+  <meta property="og:title" content="Area — Lewisham Live" />
+  <meta property="og:description" content="Area incidents from Lewisham Live" />
+  <meta property="og:url" content="https://lewishamlive.co.uk" />
+  <meta property="og:type" content="website" />
+  <style>
+    :root {
+      --bg-base: #0f1117; --bg-card: #1a1d2e; --bg-card-hover: #1e2235;
+      --border: #2d3148; --border-focus: #3b82f6;
+      --text-primary: #e2e8f0; --text-secondary: #94a3b8; --text-muted: #475569;
+      --accent-blue: #3b82f6; --sev-critical: #ef4444; --sev-major: #f97316; --sev-minor: #facc15; --sev-info: #60a5fa;
+      --success: #4ade80; --danger: #ef4444;
+      --shadow-sm: 0 1px 3px rgba(0,0,0,0.3); --shadow-md: 0 4px 12px rgba(0,0,0,0.4);
+      --radius-sm: 6px; --radius-md: 8px; --radius-lg: 10px;
+      --space-xs: 4px; --space-sm: 8px; --space-md: 16px; --space-lg: 24px; --space-xl: 32px;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: var(--bg-base);
+      color: var(--text-primary);
+      min-height: 100vh;
+    }
+
+    header {
+      background: var(--bg-card);
+      border-bottom: 1px solid var(--border);
+      padding: 0 var(--space-lg);
+      height: 48px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 1000;
+    }
+
+    .header-left { display: flex; align-items: baseline; gap: var(--space-sm); }
+    header h1 { font-size: 17px; font-weight: 600; color: #fff; letter-spacing: -0.3px; }
+    header h1 a { color: inherit; text-decoration: none; }
+    header h1 a:hover { opacity: 0.85; }
+    .header-tagline { font-size: 11px; color: var(--text-muted); font-weight: 400; letter-spacing: 0.02em; }
+
+    .header-right { display: flex; gap: 4px; align-items: center; }
+    .header-right a {
+      font-size: 12px; font-weight: 500; padding: 6px 12px;
+      border-radius: var(--radius-sm); color: var(--text-secondary);
+      text-decoration: none; transition: color 0.15s, background 0.15s;
+    }
+    .header-right a:hover { color: var(--text-primary); background: rgba(255,255,255,0.05); }
+
+    .container { max-width: 860px; margin: 0 auto; padding: var(--space-lg); }
+
+    .back-link {
+      display: inline-flex; align-items: center; gap: 6px;
+      font-size: 13px; color: var(--accent-blue); text-decoration: none;
+      margin-bottom: var(--space-lg);
+      transition: opacity 0.15s;
+    }
+    .back-link:hover { opacity: 0.8; }
+
+    .page-title { margin-bottom: var(--space-lg); }
+    .page-title h2 { font-size: 22px; font-weight: 700; color: #fff; margin-bottom: 4px; }
+    .page-title p { font-size: 13px; color: var(--text-muted); }
+
+    .stats-row {
+      display: flex; gap: 12px; margin-bottom: var(--space-lg); flex-wrap: wrap;
+    }
+    .stat-chip {
+      background: var(--bg-card); border: 1px solid var(--border);
+      border-radius: 20px; padding: 6px 16px;
+      font-size: 12px; color: var(--text-secondary);
+      display: flex; align-items: center; gap: 6px;
+    }
+    .stat-chip strong { color: #fff; font-weight: 600; }
+    .stat-chip.critical strong { color: var(--sev-critical); }
+    .stat-chip.major strong { color: var(--sev-major); }
+
+    .map-link {
+      display: inline-flex; align-items: center; gap: 6px;
+      font-size: 12px; color: var(--accent-blue); text-decoration: none;
+      margin-bottom: var(--space-lg);
+      padding: 6px 14px;
+      border: 1px solid rgba(59,130,246,0.3);
+      border-radius: var(--radius-sm);
+      transition: background 0.15s;
+    }
+    .map-link:hover { background: rgba(59,130,246,0.1); }
+
+    .events-list { display: flex; flex-direction: column; gap: 10px; }
+
+    .event-card {
+      display: flex; background: var(--bg-card); border: 1px solid var(--border);
+      border-radius: var(--radius-lg); overflow: hidden;
+      transition: background 0.15s, box-shadow 0.15s, transform 0.15s;
+      cursor: pointer; text-decoration: none; color: inherit;
+    }
+    .event-card:hover {
+      background: var(--bg-card-hover); box-shadow: var(--shadow-md);
+      transform: translateY(-1px);
+    }
+
+    .sev-accent { width: 3px; flex-shrink: 0; }
+    .sev-accent.critical { background: var(--sev-critical); }
+    .sev-accent.major { background: var(--sev-major); }
+    .sev-accent.minor { background: var(--sev-minor); }
+    .sev-accent.info { background: var(--sev-info); }
+
+    .event-body { flex: 1; padding: 14px 16px; min-width: 0; }
+    .event-title {
+      font-size: 15px; font-weight: 600; color: #fff;
+      margin-bottom: 6px; line-height: 1.3;
+    }
+    .event-summary {
+      font-size: 13px; color: var(--text-secondary); line-height: 1.5;
+      display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical;
+      overflow: hidden; margin-bottom: 10px;
+    }
+    .event-meta { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .sev-badge {
+      font-size: 10px; font-weight: 700; text-transform: uppercase;
+      padding: 2px 8px; border-radius: 10px; letter-spacing: 0.04em;
+    }
+    .sev-badge.critical { background: rgba(239,68,68,0.15); color: var(--sev-critical); }
+    .sev-badge.major { background: rgba(249,115,22,0.15); color: var(--sev-major); }
+    .sev-badge.minor { background: rgba(250,204,21,0.15); color: var(--sev-minor); }
+    .sev-badge.info { background: rgba(96,165,250,0.15); color: var(--sev-info); }
+    .meta-tag { font-size: 11px; color: var(--text-muted); }
+    .meta-sep { color: var(--border); font-size: 10px; }
+
+    .empty-state {
+      text-align: center; padding: 60px 20px; color: var(--text-muted); font-size: 14px;
+    }
+
+    .skeleton-card {
+      background: var(--bg-card); border: 1px solid var(--border);
+      border-radius: var(--radius-lg); padding: 16px; margin-bottom: 10px;
+    }
+    .skeleton-line {
+      height: 12px; border-radius: 4px; background: var(--border);
+      animation: shimmer 1.2s infinite;
+    }
+    .skeleton-line.w60 { width: 60%; margin-bottom: 10px; height: 16px; }
+    .skeleton-line.w90 { width: 90%; margin-bottom: 6px; }
+    .skeleton-line.w40 { width: 40%; margin-top: 8px; }
+    @keyframes shimmer { 0%,100%{opacity:0.4} 50%{opacity:0.7} }
+
+    @media (max-width: 600px) {
+      .container { padding: var(--space-md); }
+      .page-title h2 { font-size: 19px; }
+      header { padding: 0 var(--space-md); }
+      .header-tagline { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="header-left">
+    <h1><a href="/">Lewisham Live</a></h1>
+    <span class="header-tagline">Crime intelligence</span>
+  </div>
+  <div class="header-right">
+    <a href="/">Home</a>
+    <a href="/events">Events</a>
+    <a href="/briefings">Briefings</a>
+  </div>
+</header>
+
+<main class="container">
+  <a href="/areas" class="back-link">&larr; All areas</a>
+
+  <div class="page-title">
+    <h2 id="areaTitle">Loading...</h2>
+    <p id="areaSubtitle">Events in this area from the last 30 days</p>
+  </div>
+
+  <div class="stats-row" id="statsRow" style="display:none;">
+    <div class="stat-chip"><strong id="statTotal">0</strong> events</div>
+    <div class="stat-chip critical" id="statCritWrap" style="display:none;"><strong id="statCrit">0</strong> critical</div>
+    <div class="stat-chip major" id="statMajWrap" style="display:none;"><strong id="statMaj">0</strong> major</div>
+  </div>
+
+  <a href="/" class="map-link" id="mapLink" style="display:none;">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
+    View on map
+  </a>
+
+  <div class="events-list" id="eventsList"></div>
+</main>
+
+<script>
+(function() {
+  'use strict';
+
+  var API = 'https://lewisham-osint-backend.onrender.com';
+
+  function esc(str) {
+    if (!str) return '';
+    var el = document.createElement('span');
+    el.textContent = String(str);
+    return el.innerHTML;
+  }
+
+  function timeAgo(dateStr) {
+    if (!dateStr) return '';
+    var diff = Date.now() - new Date(dateStr).getTime();
+    var mins = Math.floor(diff / 60000);
+    if (mins < 1) return 'just now';
+    if (mins < 60) return mins + 'm ago';
+    var hrs = Math.floor(mins / 60);
+    if (hrs < 24) return hrs + 'h ago';
+    var days = Math.floor(hrs / 24);
+    return days + 'd ago';
+  }
+
+  function sevClass(sev) {
+    if (!sev) return 'info';
+    var s = sev.toLowerCase();
+    if (s === 'critical') return 'critical';
+    if (s === 'major') return 'major';
+    if (s === 'minor') return 'minor';
+    return 'info';
+  }
+
+  function getAreaName() {
+    var parts = window.location.pathname.split('/');
+    var idx = parts.indexOf('area');
+    if (idx !== -1 && parts[idx + 1]) {
+      return decodeURIComponent(parts[idx + 1]);
+    }
+    return null;
+  }
+
+  function showSkeleton() {
+    var html = '';
+    for (var i = 0; i < 5; i++) {
+      html += '<div class="skeleton-card"><div class="skeleton-line w60"></div><div class="skeleton-line w90"></div><div class="skeleton-line w90"></div><div class="skeleton-line w40"></div></div>';
+    }
+    document.getElementById('eventsList').innerHTML = html;
+  }
+
+  function render(events, areaName) {
+    var list = document.getElementById('eventsList');
+
+    // Update title
+    document.getElementById('areaTitle').textContent = areaName;
+    document.title = areaName + ' — Lewisham Live';
+
+    // Stats
+    var total = events.length;
+    var critCount = 0;
+    var majCount = 0;
+    for (var i = 0; i < events.length; i++) {
+      var sev = (events[i].severity || '').toLowerCase();
+      if (sev === 'critical') critCount++;
+      if (sev === 'major') majCount++;
+    }
+
+    document.getElementById('statTotal').textContent = total;
+    document.getElementById('statsRow').style.display = '';
+
+    if (critCount > 0) {
+      document.getElementById('statCrit').textContent = critCount;
+      document.getElementById('statCritWrap').style.display = '';
+    }
+    if (majCount > 0) {
+      document.getElementById('statMaj').textContent = majCount;
+      document.getElementById('statMajWrap').style.display = '';
+    }
+
+    // Map link
+    document.getElementById('mapLink').style.display = '';
+    document.getElementById('mapLink').href = '/?area=' + encodeURIComponent(areaName);
+
+    if (events.length === 0) {
+      list.innerHTML = '<div class="empty-state">No events found for this area in the last 30 days.</div>';
+      return;
+    }
+
+    var html = '';
+    for (var j = 0; j < events.length; j++) {
+      var e = events[j];
+      var sc = sevClass(e.severity);
+      html += '<a class="event-card" href="/event/' + esc(e.id) + '">'
+        + '<div class="sev-accent ' + sc + '"></div>'
+        + '<div class="event-body">'
+        + '<div class="event-title">' + esc(e.title) + '</div>'
+        + '<div class="event-summary">' + esc(e.summary) + '</div>'
+        + '<div class="event-meta">'
+        + '<span class="sev-badge ' + sc + '">' + esc(e.severity || 'info') + '</span>'
+        + (e.category ? '<span class="meta-sep">&#183;</span><span class="meta-tag">' + esc(e.category) + '</span>' : '')
+        + (e.source_count ? '<span class="meta-sep">&#183;</span><span class="meta-tag">' + esc(e.source_count) + ' source' + (e.source_count !== 1 ? 's' : '') + '</span>' : '')
+        + '<span class="meta-sep">&#183;</span><span class="meta-tag">' + esc(timeAgo(e.last_updated)) + '</span>'
+        + '</div></div></a>';
+    }
+    list.innerHTML = html;
+  }
+
+  var areaName = getAreaName();
+  if (!areaName) {
+    document.getElementById('areaTitle').textContent = 'Area not found';
+    document.getElementById('eventsList').innerHTML = '<div class="empty-state">No area specified. <a href="/areas" style="color:var(--accent-blue);">Browse all areas</a></div>';
+  } else {
+    document.getElementById('areaTitle').textContent = areaName;
+    showSkeleton();
+
+    fetch(API + '/api/areas/' + encodeURIComponent(areaName))
+      .then(function(res) { return res.json(); })
+      .then(function(json) {
+        render(json.data || [], json.area || areaName);
+      })
+      .catch(function() {
+        document.getElementById('eventsList').innerHTML = '<div class="empty-state">Failed to load events. Please try again later.</div>';
+      });
+  }
+})();
+</script>
+
+</body>
+</html>
