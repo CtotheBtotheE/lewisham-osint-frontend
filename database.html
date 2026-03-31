@@ -470,6 +470,7 @@
   <div class="tab-bar">
     <button class="tab-btn active" id="tab-sources" onclick="switchTab('sources')">Sources</button>
     <button class="tab-btn" id="tab-events" onclick="switchTab('events')">Events</button>
+    <button class="tab-btn" id="tab-reports" onclick="switchTab('reports')">Reports</button>
   </div>
 
   <div class="sources-panel" id="sources-panel">
@@ -574,6 +575,15 @@
     </div>
     <div id="events-list"></div>
     <div class="empty-state hidden" id="events-empty">No events yet. The pipeline runs every 15 minutes to process new sources into events.</div>
+  </div>
+
+  <div class="events-panel" id="reports-panel">
+    <div class="controls">
+      <span style="font-size:13px;font-weight:600;color:var(--text-primary);">Public Reports</span>
+      <span style="font-size:11px;color:var(--text-muted);" id="reports-count"></span>
+    </div>
+    <div id="reports-list"></div>
+    <div class="empty-state hidden" id="reports-empty">No public reports submitted yet.</div>
   </div>
 
 </div>
@@ -1364,9 +1374,42 @@ function switchTab(tab) {
   currentTab = tab;
   document.getElementById('tab-sources').classList.toggle('active', tab === 'sources');
   document.getElementById('tab-events').classList.toggle('active', tab === 'events');
+  document.getElementById('tab-reports').classList.toggle('active', tab === 'reports');
   document.getElementById('sources-panel').classList.toggle('hidden', tab !== 'sources');
   document.getElementById('events-panel').classList.toggle('show', tab === 'events');
+  document.getElementById('reports-panel').classList.toggle('show', tab === 'reports');
   if (tab === 'events') loadEvents();
+  if (tab === 'reports') loadReports();
+}
+
+async function loadReports() {
+  try {
+    const r = await fetch(`${BASE}/api/reports`, FETCH_OPTS);
+    const json = await r.json();
+    const reports = json.data || [];
+    document.getElementById('reports-count').textContent = reports.length + ' reports';
+    document.getElementById('reports-empty').classList.toggle('hidden', reports.length > 0);
+    document.getElementById('reports-list').classList.toggle('hidden', reports.length === 0);
+    if (reports.length === 0) return;
+    document.getElementById('reports-list').innerHTML = reports.map(rpt => {
+      let dateStr = '';
+      try { dateStr = new Date(rpt.created_at).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }); } catch {}
+      const statusColor = rpt.status === 'reviewed' ? '#4ade80' : rpt.status === 'dismissed' ? '#ef4444' : '#f59e0b';
+      return `<div class="event-card" style="border-left:3px solid ${statusColor};">
+        <div class="event-card-header">
+          <div class="event-card-title">${escHtml(rpt.title || 'Untitled Report')}</div>
+          <span style="font-size:10px;padding:2px 8px;border-radius:10px;background:rgba(245,158,11,0.15);color:${statusColor};">${escHtml(rpt.status)}</span>
+        </div>
+        <div class="event-card-summary">${escHtml(rpt.description || '')}</div>
+        <div class="event-card-meta">
+          <span>${escHtml(rpt.location || 'No location')}</span>
+          <span>${escHtml(rpt.category || 'other')}</span>
+          <span>${dateStr}</span>
+          ${rpt.contact_email ? `<span style="color:#3b82f6;">${escHtml(rpt.contact_email)}</span>` : ''}
+        </div>
+      </div>`;
+    }).join('');
+  } catch {}
 }
 
 // ─── Events Tab ──────────────────────────────────────
