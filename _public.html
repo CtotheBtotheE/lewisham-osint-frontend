@@ -256,6 +256,34 @@
       .container { padding: var(--space-sm) var(--space-md); }
       .leaflet-popup-content { max-width: calc(100vw - 48px); }
       .card-header { flex-direction: column; align-items: flex-start; gap: var(--space-sm); }
+      .stats-banner { flex-wrap: wrap; gap: 12px; }
+    }
+
+    /* ---------- Stats banner ---------- */
+    .stats-banner { display: flex; gap: 24px; justify-content: center; padding: 12px 16px; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-lg); margin-bottom: 16px; }
+    .stat-item { text-align: center; }
+    .stat-value { display: block; font-size: 22px; font-weight: 700; color: var(--text-primary); }
+    .stat-label { font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; }
+
+    /* ---------- Events feed ---------- */
+    .events-feed { max-height: 500px; overflow-y: auto; }
+    .event-feed-item { display: flex; padding: 12px 16px; border-bottom: 1px solid var(--border); transition: background 0.15s; }
+    .event-feed-item:hover { background: var(--bg-card-hover); }
+    .event-feed-accent { width: 3px; border-radius: 2px; margin-right: 12px; flex-shrink: 0; }
+    .event-feed-body { flex: 1; min-width: 0; }
+    .event-feed-title { font-size: 13px; font-weight: 600; color: var(--text-primary); margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .event-feed-meta { display: flex; gap: 8px; font-size: 10px; color: var(--text-muted); margin-bottom: 4px; flex-wrap: wrap; }
+    .event-feed-badge { font-weight: 700; text-transform: uppercase; }
+    .event-feed-summary { font-size: 11px; color: var(--text-secondary); line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+    .loading-msg { padding: 24px 16px; text-align: center; font-size: 12px; color: var(--text-muted); }
+
+    /* ---------- Heatmap layer button ---------- */
+    .layer-btn.heat {
+      border-color: #f97316; color: #fff;
+      background: #f97316;
+    }
+    .layer-btn.heat.off {
+      background: transparent; color: #fb923c; opacity: 0.5;
     }
   </style>
 </head>
@@ -295,12 +323,20 @@
     </div>
   </div>
 
+  <div class="stats-banner" id="stats-banner" style="display:none;">
+    <div class="stat-item"><span class="stat-value" id="stat-week">0</span><span class="stat-label">Events this week</span></div>
+    <div class="stat-item"><span class="stat-value" id="stat-today">0</span><span class="stat-label">Today</span></div>
+    <div class="stat-item"><span class="stat-value" id="stat-category">&mdash;</span><span class="stat-label">Top category</span></div>
+    <div class="stat-item"><span class="stat-value" id="stat-area">&mdash;</span><span class="stat-label">Hotspot area</span></div>
+  </div>
+
   <div class="card">
     <div class="card-header">
       <h2>Crime map &mdash; Lewisham borough</h2>
       <div style="display:flex;gap:8px;align-items:center;">
         <div class="layer-toggles">
           <button class="layer-btn crime" id="toggle-crime" onclick="toggleLayer('crime')">Historical Crime</button>
+          <button class="layer-btn heat off" id="btn-heat" onclick="toggleHeatmap()">Heatmap</button>
         </div>
         <span style="font-size:11px;color:#475569;" id="map-count"></span>
       </div>
@@ -314,9 +350,20 @@
     </div>
   </div>
 
+  <div class="card" style="margin-top:16px;">
+    <div class="card-header">
+      <h2>Latest Incidents</h2>
+      <a href="/events" style="font-size:11px;color:var(--accent-blue);text-decoration:none;">View all &rarr;</a>
+    </div>
+    <div class="events-feed" id="public-events-feed">
+      <div class="loading-msg">Loading incidents...</div>
+    </div>
+  </div>
+
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
 <script>
 
   const BASE = 'https://lewisham-osint-backend.onrender.com';
@@ -324,6 +371,82 @@
   let map;
   let crimeLayer;
   let showCrime = true;
+  let heatLayer = null;
+  let heatmapVisible = false;
+
+  function esc(str) {
+    const d = document.createElement('div');
+    d.textContent = str || '';
+    return d.innerHTML;
+  }
+
+  function timeAgo(date) {
+    if (!date) return '';
+    const seconds = Math.floor((Date.now() - date) / 1000);
+    if (seconds < 60) return seconds + 's ago';
+    if (seconds < 3600) return Math.floor(seconds / 60) + 'm ago';
+    if (seconds < 86400) return Math.floor(seconds / 3600) + 'h ago';
+    return Math.floor(seconds / 86400) + 'd ago';
+  }
+
+  function toggleHeatmap() {
+    const btn = document.getElementById('btn-heat');
+    if (heatmapVisible) {
+      if (heatLayer) map.removeLayer(heatLayer);
+      btn.classList.add('off');
+    } else {
+      if (heatLayer) heatLayer.addTo(map);
+      btn.classList.remove('off');
+    }
+    heatmapVisible = !heatmapVisible;
+  }
+
+  async function loadPublicEvents() {
+    try {
+      const r = await fetch(BASE + '/api/events/public');
+      const json = await r.json();
+      const events = json.data || [];
+      const feed = document.getElementById('public-events-feed');
+      if (!events.length) {
+        feed.innerHTML = '<div class="loading-msg">No recent incidents.</div>';
+        return;
+      }
+      const sevColor = { critical: '#ef4444', major: '#f97316', minor: '#facc15', info: '#60a5fa' };
+      feed.innerHTML = events.slice(0, 15).map(ev => {
+        const ago = timeAgo(new Date(ev.last_updated));
+        const color = sevColor[ev.severity] || '#60a5fa';
+        return `<div class="event-feed-item" onclick="window.location='/event/${ev.id}'" style="cursor:pointer;">
+          <div class="event-feed-accent" style="background:${color};"></div>
+          <div class="event-feed-body">
+            <div class="event-feed-title">${esc(ev.title)}</div>
+            <div class="event-feed-meta">
+              <span class="event-feed-badge" style="color:${color};">${esc(ev.severity)}</span>
+              <span>${esc(ev.area_name || '')}</span>
+              <span>${esc(ev.category)}</span>
+              <span>${ev.source_count} source${ev.source_count !== 1 ? 's' : ''}</span>
+              <span>${ago}</span>
+            </div>
+            <div class="event-feed-summary">${esc((ev.summary || '').slice(0, 180))}</div>
+          </div>
+        </div>`;
+      }).join('');
+    } catch {
+      document.getElementById('public-events-feed').innerHTML = '<div class="loading-msg">Failed to load.</div>';
+    }
+  }
+
+  async function loadStats() {
+    try {
+      const r = await fetch(BASE + '/api/stats');
+      const json = await r.json();
+      const d = json.data || {};
+      document.getElementById('stat-week').textContent = d.eventsThisWeek || 0;
+      document.getElementById('stat-today').textContent = d.eventsToday || 0;
+      document.getElementById('stat-category').textContent = d.topCategory || '\u2014';
+      document.getElementById('stat-area').textContent = d.topArea || '\u2014';
+      document.getElementById('stats-banner').style.display = '';
+    } catch {}
+  }
 
   function toggleLayer(layer) {
     if (layer === 'crime') {
@@ -539,6 +662,20 @@
       });
 
       document.getElementById('map-count').textContent = crimes.length + ' incidents plotted (' + usedMonth + ')';
+
+      // Build heatmap data from events
+      try {
+        const eventsR = await fetch(BASE + '/api/events');
+        const eventsJson = await eventsR.json();
+        const eventsData = eventsJson.data || [];
+        const heatPoints = eventsData
+          .filter(e => e.lat && e.lng)
+          .map(e => [e.lat, e.lng, e.severity === 'critical' ? 1.0 : e.severity === 'major' ? 0.7 : 0.4]);
+        if (heatLayer) map.removeLayer(heatLayer);
+        heatLayer = L.heatLayer(heatPoints, { radius: 25, blur: 15, maxZoom: 17, gradient: { 0.2: '#3b82f6', 0.4: '#facc15', 0.6: '#f97316', 1: '#ef4444' } });
+        if (heatmapVisible) heatLayer.addTo(map);
+      } catch {}
+
     } catch {
       document.getElementById('m-police').textContent = 'N/A';
     }
@@ -547,7 +684,10 @@
   window.addEventListener('load', () => {
     initMap();
     loadData();
+    loadPublicEvents();
+    loadStats();
     setInterval(loadData, 300000);
+    setInterval(() => { loadPublicEvents(); loadStats(); }, 300000);
   });
 
 </script>
