@@ -11,6 +11,8 @@
   <meta property="og:url" content="https://lewishamlive.co.uk/briefings.html" />
   <meta name="robots" content="index, follow" />
   <link rel="canonical" href="https://lewishamlive.co.uk/briefings.html" />
+  <link rel="manifest" href="/manifest.json">
+  <meta name="theme-color" content="#0f1117">
   <style>
     :root {
       --bg-base: #0f1117; --bg-card: #1a1d2e; --bg-card-hover: #1e2235;
@@ -271,6 +273,16 @@
       .briefing-card__footer { padding: 8px 14px; }
       nav a { padding: 4px 8px; font-size: 11px; }
     }
+
+    @media print {
+      body { background: #fff; color: #000; }
+      .header, .nav-link, button, .card-header a { display: none !important; }
+      .card { background: #fff; border: 1px solid #ccc; box-shadow: none; break-inside: avoid; }
+      .briefing-text { color: #000; font-size: 12pt; line-height: 1.6; }
+      .briefing-header { color: #333; }
+      .container { max-width: 100%; padding: 0; }
+      .briefing-meta { color: #666; }
+    }
   </style>
 <script type="application/ld+json">
 {
@@ -292,9 +304,10 @@
   </div>
   <div class="header-right">
     <nav>
-      <a href="_public.html">Home</a>
-      <a href="_public.html#events">Events</a>
-      <a href="briefings.html" class="active">Briefings</a>
+      <a href="/">Home</a>
+      <a href="/events">Events</a>
+      <a href="/briefings" class="active">Briefings</a>
+      <a href="/areas">Areas</a>
     </nav>
   </div>
 </header>

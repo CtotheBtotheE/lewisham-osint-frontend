@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Areas — Lewisham Live</title>
+  <meta name="description" content="Browse incidents by area in Lewisham, South East London." />
+  <meta property="og:title" content="Areas — Lewisham Live" />
+  <meta property="og:description" content="Browse incidents by area in Lewisham" />
+  <meta property="og:url" content="https://lewishamlive.co.uk/areas" />
+  <meta property="og:type" content="website" />
+  <style>
+    :root {
+      --bg-base: #0f1117; --bg-card: #1a1d2e; --bg-card-hover: #1e2235;
+      --border: #2d3148; --border-focus: #3b82f6;
+      --text-primary: #e2e8f0; --text-secondary: #94a3b8; --text-muted: #475569;
+      --accent-blue: #3b82f6; --sev-critical: #ef4444; --sev-major: #f97316; --sev-minor: #facc15; --sev-info: #60a5fa;
+      --success: #4ade80; --danger: #ef4444;
+      --shadow-sm: 0 1px 3px rgba(0,0,0,0.3); --shadow-md: 0 4px 12px rgba(0,0,0,0.4);
+      --radius-sm: 6px; --radius-md: 8px; --radius-lg: 10px;
+      --space-xs: 4px; --space-sm: 8px; --space-md: 16px; --space-lg: 24px; --space-xl: 32px;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: var(--bg-base);
+      color: var(--text-primary);
+      min-height: 100vh;
+    }
+
+    header {
+      background: var(--bg-card);
+      border-bottom: 1px solid var(--border);
+      padding: 0 var(--space-lg);
+      height: 48px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 1000;
+    }
+
+    .header-left { display: flex; align-items: baseline; gap: var(--space-sm); }
+    header h1 { font-size: 17px; font-weight: 600; color: #fff; letter-spacing: -0.3px; }
+    header h1 a { color: inherit; text-decoration: none; }
+    header h1 a:hover { opacity: 0.85; }
+    .header-tagline { font-size: 11px; color: var(--text-muted); font-weight: 400; letter-spacing: 0.02em; }
+
+    .header-right { display: flex; gap: 4px; align-items: center; }
+    .header-right a {
+      font-size: 12px; font-weight: 500; padding: 6px 12px;
+      border-radius: var(--radius-sm); color: var(--text-secondary);
+      text-decoration: none; transition: color 0.15s, background 0.15s;
+    }
+    .header-right a:hover { color: var(--text-primary); background: rgba(255,255,255,0.05); }
+
+    .container { max-width: 860px; margin: 0 auto; padding: var(--space-lg); }
+
+    .page-title { margin-bottom: var(--space-lg); }
+    .page-title h2 { font-size: 22px; font-weight: 700; color: #fff; margin-bottom: 4px; }
+    .page-title p { font-size: 13px; color: var(--text-muted); }
+
+    .areas-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 12px;
+    }
+
+    .area-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: var(--space-lg);
+      text-decoration: none;
+      color: inherit;
+      transition: background 0.15s, box-shadow 0.15s, transform 0.15s;
+      display: block;
+    }
+    .area-card:hover {
+      background: var(--bg-card-hover);
+      box-shadow: var(--shadow-md);
+      transform: translateY(-1px);
+    }
+
+    .area-name {
+      font-size: 16px; font-weight: 700; color: #fff;
+      margin-bottom: 8px;
+    }
+
+    .area-count {
+      font-size: 24px; font-weight: 700; color: var(--accent-blue);
+      margin-bottom: 4px;
+    }
+    .area-count-label {
+      font-size: 12px; color: var(--text-muted); margin-bottom: 12px;
+    }
+
+    .area-badges { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
+    .area-badge {
+      font-size: 10px; font-weight: 700; text-transform: uppercase;
+      padding: 2px 8px; border-radius: 10px; letter-spacing: 0.04em;
+    }
+    .area-badge.critical { background: rgba(239,68,68,0.15); color: var(--sev-critical); }
+    .area-badge.major { background: rgba(249,115,22,0.15); color: var(--sev-major); }
+
+    .area-latest {
+      font-size: 11px; color: var(--text-muted);
+      border-top: 1px solid var(--border);
+      padding-top: 8px;
+    }
+
+    .empty-state {
+      text-align: center; padding: 60px 20px; color: var(--text-muted); font-size: 14px;
+    }
+
+    .skeleton-card {
+      background: var(--bg-card); border: 1px solid var(--border);
+      border-radius: var(--radius-lg); padding: var(--space-lg);
+    }
+    .skeleton-line {
+      height: 12px; border-radius: 4px; background: var(--border);
+      animation: shimmer 1.2s infinite;
+    }
+    .skeleton-line.w60 { width: 60%; margin-bottom: 10px; height: 18px; }
+    .skeleton-line.w40 { width: 40%; margin-bottom: 6px; }
+    .skeleton-line.w30 { width: 30%; }
+    @keyframes shimmer { 0%,100%{opacity:0.4} 50%{opacity:0.7} }
+
+    @media (max-width: 600px) {
+      .container { padding: var(--space-md); }
+      .page-title h2 { font-size: 19px; }
+      header { padding: 0 var(--space-md); }
+      .header-tagline { display: none; }
+      .areas-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="header-left">
+    <h1><a href="/">Lewisham Live</a></h1>
+    <span class="header-tagline">Crime intelligence</span>
+  </div>
+  <div class="header-right">
+    <a href="/">Home</a>
+    <a href="/events">Events</a>
+    <a href="/briefings">Briefings</a>
+  </div>
+</header>
+
+<main class="container">
+  <div class="page-title">
+    <h2>Areas</h2>
+    <p>Browse incidents by neighbourhood — last 30 days</p>
+  </div>
+
+  <div class="areas-grid" id="areasGrid"></div>
+</main>
+
+<script>
+(function() {
+  'use strict';
+
+  var API = 'https://lewisham-osint-backend.onrender.com';
+
+  function esc(str) {
+    if (!str) return '';
+    var el = document.createElement('span');
+    el.textContent = String(str);
+    return el.innerHTML;
+  }
+
+  function timeAgo(dateStr) {
+    if (!dateStr) return '';
+    var diff = Date.now() - new Date(dateStr).getTime();
+    var mins = Math.floor(diff / 60000);
+    if (mins < 1) return 'just now';
+    if (mins < 60) return mins + 'm ago';
+    var hrs = Math.floor(mins / 60);
+    if (hrs < 24) return hrs + 'h ago';
+    var days = Math.floor(hrs / 24);
+    return days + 'd ago';
+  }
+
+  function showSkeleton() {
+    var html = '';
+    for (var i = 0; i < 6; i++) {
+      html += '<div class="skeleton-card"><div class="skeleton-line w60"></div><div class="skeleton-line w40"></div><div class="skeleton-line w30"></div></div>';
+    }
+    document.getElementById('areasGrid').innerHTML = html;
+  }
+
+  function render(areas) {
+    var grid = document.getElementById('areasGrid');
+    if (!areas || areas.length === 0) {
+      grid.innerHTML = '<div class="empty-state">No area data available yet.</div>';
+      return;
+    }
+
+    var html = '';
+    for (var i = 0; i < areas.length; i++) {
+      var a = areas[i];
+      var critCount = parseInt(a.critical_count) || 0;
+      var majCount = parseInt(a.major_count) || 0;
+      html += '<a class="area-card" href="/area/' + encodeURIComponent(a.area_name) + '">';
+      html += '<div class="area-name">' + esc(a.area_name) + '</div>';
+      html += '<div class="area-count">' + esc(a.event_count) + '</div>';
+      html += '<div class="area-count-label">events in last 30 days</div>';
+      html += '<div class="area-badges">';
+      if (critCount > 0) html += '<span class="area-badge critical">' + critCount + ' critical</span>';
+      if (majCount > 0) html += '<span class="area-badge major">' + majCount + ' major</span>';
+      html += '</div>';
+      if (a.latest_event) html += '<div class="area-latest">Latest: ' + esc(timeAgo(a.latest_event)) + '</div>';
+      html += '</a>';
+    }
+    grid.innerHTML = html;
+  }
+
+  showSkeleton();
+
+  fetch(API + '/api/areas')
+    .then(function(res) { return res.json(); })
+    .then(function(json) {
+      render(json.data || []);
+    })
+    .catch(function() {
+      document.getElementById('areasGrid').innerHTML = '<div class="empty-state">Failed to load areas. Please try again later.</div>';
+    });
+})();
+</script>
+
+</body>
+</html>
