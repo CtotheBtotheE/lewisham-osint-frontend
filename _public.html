@@ -360,6 +360,19 @@
     </div>
   </div>
 
+  <!-- Email alerts signup -->
+  <div class="card" style="margin-top:16px;">
+    <div style="padding:20px;text-align:center;">
+      <div style="font-size:15px;font-weight:600;color:var(--text-primary);margin-bottom:4px;">Get alerts for critical incidents</div>
+      <div style="font-size:12px;color:var(--text-muted);margin-bottom:12px;">Receive email notifications when major events are confirmed in Lewisham</div>
+      <form id="subscribe-form" style="display:flex;gap:8px;max-width:400px;margin:0 auto;">
+        <input type="email" id="subscribe-email" placeholder="your@email.com" required style="flex:1;padding:8px 12px;background:var(--bg-base);border:1px solid var(--border);border-radius:var(--radius-md);color:var(--text-primary);font-size:13px;" />
+        <button type="submit" id="subscribe-btn" style="padding:8px 16px;background:var(--accent-blue);color:#fff;border:none;border-radius:var(--radius-md);font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;">Subscribe</button>
+      </form>
+      <div id="subscribe-msg" style="font-size:11px;margin-top:8px;display:none;"></div>
+    </div>
+  </div>
+
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -680,6 +693,35 @@
       document.getElementById('m-police').textContent = 'N/A';
     }
   }
+
+  document.getElementById('subscribe-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const email = document.getElementById('subscribe-email').value.trim();
+    const btn = document.getElementById('subscribe-btn');
+    const msg = document.getElementById('subscribe-msg');
+    btn.disabled = true; btn.textContent = 'Subscribing...';
+    try {
+      const r = await fetch(BASE + '/api/subscribe', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email })
+      });
+      const json = await r.json();
+      if (json.success) {
+        msg.textContent = 'Subscribed! You\'ll receive alerts for critical incidents.';
+        msg.style.color = '#4ade80';
+        btn.textContent = 'Subscribed';
+      } else {
+        msg.textContent = json.error || 'Failed to subscribe.';
+        msg.style.color = '#ef4444';
+        btn.textContent = 'Subscribe'; btn.disabled = false;
+      }
+    } catch {
+      msg.textContent = 'Connection error. Try again.';
+      msg.style.color = '#ef4444';
+      btn.textContent = 'Subscribe'; btn.disabled = false;
+    }
+    msg.style.display = 'block';
+  });
 
   window.addEventListener('load', () => {
     initMap();
