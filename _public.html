@@ -432,6 +432,22 @@
           <button class="layer-btn crime" id="toggle-crime" onclick="toggleLayer('crime')">Historical Crime</button>
           <button class="layer-btn heat off" id="btn-heat" onclick="toggleHeatmap()">Heatmap</button>
         </div>
+        <select id="category-filter" onchange="filterByCategory(this.value)" style="font-size:10px;padding:4px 8px;background:var(--bg-card);color:var(--text-secondary);border:1px solid var(--border);border-radius:20px;cursor:pointer;outline:none;">
+          <option value="">All categories</option>
+          <option value="stabbing">Stabbing</option>
+          <option value="robbery">Robbery</option>
+          <option value="assault">Assault</option>
+          <option value="burglary">Burglary</option>
+          <option value="fire">Fire</option>
+          <option value="rtc">Road collision</option>
+          <option value="drugs">Drugs</option>
+          <option value="asb">Anti-social behaviour</option>
+          <option value="theft">Theft</option>
+          <option value="shooting">Shooting</option>
+          <option value="criminal-damage">Criminal damage</option>
+          <option value="missing-person">Missing person</option>
+          <option value="public-order">Public order</option>
+        </select>
         <span style="font-size:11px;color:#475569;" id="map-count"></span>
       </div>
     </div>
@@ -451,6 +467,9 @@
         <span class="legend-dot"></span>
         Crime incident
       </div>
+    </div>
+    <div id="refresh-indicator" style="font-size:9px;color:var(--text-muted);text-align:right;margin-top:4px;padding:0 16px 8px;">
+      Last refreshed: <span id="last-refresh-time">&mdash;</span> &middot; <span id="event-count-indicator">0</span> events on map
     </div>
   </div>
 
@@ -481,7 +500,7 @@
       <div style="font-size:15px;font-weight:600;color:var(--text-primary);margin-bottom:4px;">Get alerts for critical incidents</div>
       <div style="font-size:12px;color:var(--text-muted);margin-bottom:12px;">Receive email notifications when major events are confirmed in Lewisham</div>
       <form id="subscribe-form" style="display:flex;gap:8px;max-width:400px;margin:0 auto;">
-        <input type="email" id="subscribe-email" placeholder="your@email.com" required style="flex:1;padding:8px 12px;background:var(--bg-base);border:1px solid var(--border);border-radius:var(--radius-md);color:var(--text-primary);font-size:13px;" />
+        <input type="email" id="subscribe-email" placeholder="your@email.com" required aria-label="Email address for alerts" style="flex:1;padding:8px 12px;background:var(--bg-base);border:1px solid var(--border);border-radius:var(--radius-md);color:var(--text-primary);font-size:13px;" />
         <button type="submit" id="subscribe-btn" style="padding:8px 16px;background:var(--accent-blue);color:#fff;border:none;border-radius:var(--radius-md);font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;">Subscribe</button>
       </form>
       <div id="subscribe-msg" style="font-size:11px;margin-top:8px;display:none;"></div>
@@ -496,8 +515,8 @@
     <p style="font-size:12px;color:var(--text-muted);margin-bottom:12px;">Witnessed something? Help keep Lewisham informed. Your report will be reviewed and may appear in our intelligence feed.</p>
     <form id="report-form">
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
-        <input type="text" id="report-location" placeholder="Location (e.g. Lewisham High St)" style="padding:8px 12px;background:var(--bg-base);border:1px solid var(--border);border-radius:var(--radius-md);color:var(--text-primary);font-size:12px;" />
-        <select id="report-category" style="padding:8px 12px;background:var(--bg-base);border:1px solid var(--border);border-radius:var(--radius-md);color:var(--text-primary);font-size:12px;">
+        <input type="text" id="report-location" placeholder="Location (e.g. Lewisham High St)" aria-label="Incident location" style="padding:8px 12px;background:var(--bg-base);border:1px solid var(--border);border-radius:var(--radius-md);color:var(--text-primary);font-size:12px;" />
+        <select id="report-category" aria-label="Incident category" style="padding:8px 12px;background:var(--bg-base);border:1px solid var(--border);border-radius:var(--radius-md);color:var(--text-primary);font-size:12px;">
           <option value="other">Category</option>
           <option value="assault">Assault</option>
           <option value="robbery">Robbery</option>
@@ -510,9 +529,9 @@
           <option value="other">Other</option>
         </select>
       </div>
-      <textarea id="report-description" placeholder="What happened? Provide as much detail as you can..." required minlength="10" maxlength="2000" style="width:100%;padding:8px 12px;background:var(--bg-base);border:1px solid var(--border);border-radius:var(--radius-md);color:var(--text-primary);font-size:12px;min-height:80px;resize:vertical;font-family:inherit;margin-bottom:8px;"></textarea>
+      <textarea id="report-description" placeholder="What happened? Provide as much detail as you can..." required minlength="10" maxlength="2000" aria-label="Incident description" style="width:100%;padding:8px 12px;background:var(--bg-base);border:1px solid var(--border);border-radius:var(--radius-md);color:var(--text-primary);font-size:12px;min-height:80px;resize:vertical;font-family:inherit;margin-bottom:8px;"></textarea>
       <div style="display:flex;gap:8px;align-items:center;">
-        <input type="email" id="report-email" placeholder="Email (optional, for follow-up)" style="flex:1;padding:8px 12px;background:var(--bg-base);border:1px solid var(--border);border-radius:var(--radius-md);color:var(--text-primary);font-size:12px;" />
+        <input type="email" id="report-email" placeholder="Email (optional, for follow-up)" aria-label="Contact email (optional)" style="flex:1;padding:8px 12px;background:var(--bg-base);border:1px solid var(--border);border-radius:var(--radius-md);color:var(--text-primary);font-size:12px;" />
         <button type="submit" id="report-btn" style="padding:8px 16px;background:var(--sev-major);color:#fff;border:none;border-radius:var(--radius-md);font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;">Submit Report</button>
       </div>
       <div id="report-msg" style="font-size:11px;margin-top:8px;display:none;"></div>
@@ -562,6 +581,7 @@
   let eventsLayer = null;
   let allEventsData = [];
   let currentTimeFilterHours = 1;
+  let currentCategoryFilter = '';
 
   function esc(str) {
     const d = document.createElement('div');
@@ -590,6 +610,11 @@
     heatmapVisible = !heatmapVisible;
   }
 
+  function filterByCategory(category) {
+    currentCategoryFilter = category;
+    loadEventsOnMap(allEventsData);
+  }
+
   async function loadPublicEvents() {
     try {
       const r = await fetch(BASE + '/api/events/public');
@@ -604,7 +629,7 @@
       feed.innerHTML = events.slice(0, 15).map(ev => {
         const ago = timeAgo(new Date(ev.last_updated));
         const color = sevColor[ev.severity] || '#60a5fa';
-        return `<div class="event-feed-item" onclick="window.location='/event/${ev.id}'" style="cursor:pointer;">
+        return `<a class="event-feed-item" href="/event/${encodeURIComponent(ev.id)}" style="cursor:pointer;text-decoration:none;color:inherit;">
           <div class="event-feed-accent" style="background:${color};"></div>
           <div class="event-feed-body">
             <div class="event-feed-title">${esc(ev.title)}</div>
@@ -617,7 +642,7 @@
             </div>
             <div class="event-feed-summary">${esc((ev.summary || '').slice(0, 180))}</div>
           </div>
-        </div>`;
+        </a>`;
       }).join('');
     } catch {
       document.getElementById('public-events-feed').innerHTML = '<div class="loading-msg">Failed to load.</div>';
@@ -659,9 +684,13 @@
     const now = Date.now();
     const oneHourMs = 3600000;
 
-    // Filter events by time
+    // Filter events by time and category
     const filtered = events.filter(ev => {
       if (!ev.lat || !ev.lng) return false;
+      if (currentCategoryFilter) {
+        const evCat = (ev.category || '').toLowerCase();
+        if (evCat !== currentCategoryFilter) return false;
+      }
       if (currentTimeFilterHours === 0) return true;
       if (!ev.last_updated) return false;
       const evTime = new Date(ev.last_updated).getTime();
@@ -702,6 +731,10 @@
         }).bindTooltip(name, { permanent: false, direction: 'top' }).addTo(eventsLayer);
       }
     });
+
+    // Update refresh indicator
+    document.getElementById('last-refresh-time').textContent = new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+    document.getElementById('event-count-indicator').textContent = filtered.length;
   }
 
   function initMap() {

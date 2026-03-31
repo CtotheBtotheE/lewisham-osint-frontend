@@ -199,7 +199,7 @@ async function loadDismissed() {
         <td style="text-transform:capitalize;">${escHtml(item.location || '—')}</td>
         <td style="white-space:nowrap;font-size:11px;">${dateStr}</td>
         <td class="reason-cell" title="${escHtml(item.reason || '')}">${escHtml(item.reason || '—')}</td>
-        <td><button class="restore-btn" onclick="restoreItem('${escHtml(item.id)}','${escHtml(src)}',this)">Restore</button></td>
+        <td><button class="restore-btn" data-id="${escHtml(item.id)}" data-source="${escHtml(src)}" onclick="restoreItem(this.dataset.id,this.dataset.source,this)">Restore</button></td>
       </tr>`;
     });
     tbody.innerHTML = html;

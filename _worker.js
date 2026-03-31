@@ -22,6 +22,10 @@ export default {
       url.pathname = '/database.html';
       return env.ASSETS.fetch(new Request(url.toString(), request));
     }
+    if (path === '/admin/dismissed' || path === '/admin/dismissed/') {
+      url.pathname = '/admin/dismissed.html';
+      return env.ASSETS.fetch(new Request(url.toString(), request));
+    }
     if (MAINTENANCE && !path.startsWith('/admin')) {
       return new Response(MAINTENANCE_HTML, {
         status: 503,

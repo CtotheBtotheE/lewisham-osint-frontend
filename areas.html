@@ -229,7 +229,10 @@
   showSkeleton();
 
   fetch(API + '/api/areas')
-    .then(function(res) { return res.json(); })
+    .then(function(res) {
+      if (!res.ok) throw new Error('Server error (' + res.status + ')');
+      return res.json();
+    })
     .then(function(json) {
       render(json.data || []);
     })
