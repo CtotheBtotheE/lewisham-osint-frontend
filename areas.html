@@ -49,13 +49,16 @@
     header h1 a:hover { opacity: 0.85; }
     .header-tagline { font-size: 11px; color: var(--text-muted); font-weight: 400; letter-spacing: 0.02em; }
 
-    .header-right { display: flex; gap: 4px; align-items: center; }
-    .header-right a {
+    .header-right { display: flex; gap: 10px; align-items: center; }
+
+    nav { display: flex; gap: 4px; }
+    nav a {
       font-size: 12px; font-weight: 500; padding: 6px 12px;
       border-radius: var(--radius-sm); color: var(--text-secondary);
       text-decoration: none; transition: color 0.15s, background 0.15s;
     }
-    .header-right a:hover { color: var(--text-primary); background: rgba(255,255,255,0.05); }
+    nav a:hover { color: var(--text-primary); background: rgba(255,255,255,0.05); }
+    nav a.active { color: var(--accent-blue); background: rgba(59,130,246,0.1); }
 
     .container { max-width: 860px; margin: 0 auto; padding: var(--space-lg); }
 
@@ -146,9 +149,12 @@
     <span class="header-tagline">Crime intelligence</span>
   </div>
   <div class="header-right">
-    <a href="/">Home</a>
-    <a href="/events">Events</a>
-    <a href="/briefings">Briefings</a>
+    <nav>
+      <a href="/">Home</a>
+      <a href="/events">Events</a>
+      <a href="/briefings">Briefings</a>
+      <a href="/areas" class="active">Areas</a>
+    </nav>
   </div>
 </header>
 
