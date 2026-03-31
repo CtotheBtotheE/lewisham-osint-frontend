@@ -85,7 +85,7 @@
     .area-card:hover {
       background: var(--bg-card-hover);
       box-shadow: var(--shadow-md);
-      transform: translateY(-1px);
+      transform: translateY(-2px);
     }
 
     .area-name {
@@ -164,6 +164,12 @@
     <p>Browse incidents by neighbourhood — last 30 days</p>
   </div>
 
+  <!-- Area ranking bar chart -->
+  <div class="card" style="margin-bottom:16px;padding:16px 20px;" id="area-chart-wrap">
+    <div style="font-size:11px;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:12px;font-weight:500;">Incident Ranking</div>
+    <div id="area-ranking-chart" style="display:flex;flex-direction:column;gap:4px;"></div>
+  </div>
+
   <div class="areas-grid" id="areasGrid"></div>
 </main>
 
@@ -224,6 +230,23 @@
       html += '</a>';
     }
     grid.innerHTML = html;
+
+    // Render ranking chart
+    if (areas.length > 1) {
+      var maxCount = parseInt(areas[0].event_count) || 1;
+      var chartEl = document.getElementById('area-ranking-chart');
+      var barHtml = '';
+      for (var bi = 0; bi < Math.min(areas.length, 12); bi++) {
+        var ba = areas[bi];
+        var pct = (parseInt(ba.event_count) / maxCount) * 100;
+        var barColor = (parseInt(ba.critical_count) > 0) ? '#ef4444' : (parseInt(ba.major_count) > 0) ? '#f97316' : '#3b82f6';
+        barHtml += '<div style="display:flex;align-items:center;gap:8px;font-size:11px;">'
+          + '<span style="width:90px;color:var(--text-secondary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex-shrink:0;">' + esc(ba.area_name) + '</span>'
+          + '<div style="flex:1;height:8px;background:rgba(255,255,255,0.05);border-radius:4px;overflow:hidden;"><div style="height:100%;width:' + pct + '%;background:' + barColor + ';border-radius:4px;transition:width 0.5s;"></div></div>'
+          + '<span style="width:30px;text-align:right;color:var(--text-muted);font-size:10px;">' + esc(ba.event_count) + '</span></div>';
+      }
+      chartEl.innerHTML = barHtml;
+    }
   }
 
   showSkeleton();
