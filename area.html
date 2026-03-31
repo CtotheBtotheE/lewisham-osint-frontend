@@ -206,6 +206,8 @@
     <div id="category-bars" style="display:flex;flex-direction:column;gap:4px;"></div>
   </div>
 
+  <div id="area-comparison" style="display:none;margin-bottom:16px;"></div>
+
   <div class="events-list" id="eventsList"></div>
 </main>
 
@@ -352,7 +354,39 @@
         return res.json();
       })
       .then(function(json) {
-        render(json.data || [], json.area || areaName);
+        var events = json.data || [];
+        render(events, json.area || areaName);
+
+        // Fetch borough-wide stats for comparison
+        fetch(API + '/api/stats')
+          .then(function(boroughR) { return boroughR.json(); })
+          .then(function(boroughJson) {
+            var boroughData = boroughJson.data || {};
+            if (boroughData.eventsThisWeek > 0) {
+              var areaPct = Math.round((events.length / boroughData.eventsThisWeek) * 100);
+              var compEl = document.getElementById('area-comparison');
+              if (compEl) {
+                compEl.style.display = '';
+                compEl.innerHTML = ''
+                  + '<div style="font-size:11px;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px;font-weight:500;">Borough Comparison</div>'
+                  + '<div style="display:flex;gap:16px;flex-wrap:wrap;">'
+                  + '<div style="text-align:center;padding:8px 16px;background:rgba(59,130,246,0.1);border-radius:8px;">'
+                  + '<div style="font-size:20px;font-weight:700;color:var(--text-primary);">' + areaPct + '%</div>'
+                  + '<div style="font-size:9px;color:var(--text-muted);">of borough incidents</div>'
+                  + '</div>'
+                  + '<div style="text-align:center;padding:8px 16px;background:rgba(59,130,246,0.1);border-radius:8px;">'
+                  + '<div style="font-size:20px;font-weight:700;color:var(--text-primary);">' + events.length + '</div>'
+                  + '<div style="font-size:9px;color:var(--text-muted);">in this area</div>'
+                  + '</div>'
+                  + '<div style="text-align:center;padding:8px 16px;background:rgba(59,130,246,0.1);border-radius:8px;">'
+                  + '<div style="font-size:20px;font-weight:700;color:var(--text-primary);">' + boroughData.eventsThisWeek + '</div>'
+                  + '<div style="font-size:9px;color:var(--text-muted);">across Lewisham</div>'
+                  + '</div>'
+                  + '</div>';
+              }
+            }
+          })
+          .catch(function() {});
       })
       .catch(function() {
         document.getElementById('eventsList').innerHTML = '<div class="empty-state">Failed to load events. Please try again later.</div>';

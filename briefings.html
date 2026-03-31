@@ -309,6 +309,15 @@
     <p>AI-generated daily summaries of Lewisham incidents</p>
   </div>
 
+  <!-- Weekly stats summary -->
+  <div class="briefing-card" id="weekly-stats" style="margin-bottom:16px;display:none;">
+    <div style="padding:16px 20px;">
+      <div style="font-size:11px;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:12px;font-weight:500;">This Week at a Glance</div>
+      <div style="display:grid;grid-template-columns:repeat(4, 1fr);gap:12px;text-align:center;" id="weekly-stats-grid">
+      </div>
+    </div>
+  </div>
+
   <!-- Latest briefing (featured) -->
   <div id="latest-briefing">
     <div class="loading-state">
@@ -464,7 +473,24 @@
     }
   }
 
+  async function loadWeeklyStats() {
+    try {
+      const r = await fetch(API + '/api/stats');
+      const json = await r.json();
+      const d = json.data || {};
+      if (d.eventsThisWeek > 0) {
+        document.getElementById('weekly-stats').style.display = '';
+        document.getElementById('weekly-stats-grid').innerHTML = ''
+          + '<div><div style="font-size:28px;font-weight:700;color:var(--text-primary);">' + d.eventsThisWeek + '</div><div style="font-size:10px;color:var(--text-muted);">Events</div></div>'
+          + '<div><div style="font-size:28px;font-weight:700;color:var(--text-primary);">' + d.eventsToday + '</div><div style="font-size:10px;color:var(--text-muted);">Today</div></div>'
+          + '<div><div style="font-size:28px;font-weight:700;color:var(--sev-major);">' + escapeHtml(d.topCategory) + '</div><div style="font-size:10px;color:var(--text-muted);">Top Category</div></div>'
+          + '<div><div style="font-size:28px;font-weight:700;color:var(--accent-blue);">' + escapeHtml(d.topArea) + '</div><div style="font-size:10px;color:var(--text-muted);">Hotspot</div></div>';
+      }
+    } catch (e) {}
+  }
+
   // Init
+  loadWeeklyStats();
   loadLatest();
   loadPrevious();
 </script>
