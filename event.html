@@ -1,0 +1,651 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Event — Lewisham Live</title>
+  <meta name="description" content="Event details — Lewisham Live crime intelligence platform" />
+  <meta property="og:title" content="Event — Lewisham Live" />
+  <meta property="og:description" content="Event details from Lewisham Live" />
+  <meta property="og:url" content="https://lewishamlive.co.uk" />
+  <meta property="og:type" content="article" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>
+    :root {
+      --bg-base: #0f1117; --bg-card: #1a1d2e; --bg-card-hover: #1e2235;
+      --border: #2d3148; --border-focus: #3b82f6;
+      --text-primary: #e2e8f0; --text-secondary: #94a3b8; --text-muted: #475569;
+      --accent-blue: #3b82f6; --sev-critical: #ef4444; --sev-major: #f97316; --sev-minor: #facc15; --sev-info: #60a5fa;
+      --success: #4ade80; --danger: #ef4444;
+      --shadow-sm: 0 1px 3px rgba(0,0,0,0.3); --shadow-md: 0 4px 12px rgba(0,0,0,0.4);
+      --radius-sm: 6px; --radius-md: 8px; --radius-lg: 10px;
+      --space-xs: 4px; --space-sm: 8px; --space-md: 16px; --space-lg: 24px; --space-xl: 32px;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: var(--bg-base);
+      color: var(--text-primary);
+      min-height: 100vh;
+    }
+
+    /* ---------- Header ---------- */
+    header {
+      background: var(--bg-card);
+      border-bottom: 1px solid var(--border);
+      padding: 0 var(--space-lg);
+      height: 48px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 1000;
+    }
+
+    .header-left { display: flex; align-items: baseline; gap: var(--space-sm); }
+    header h1 { font-size: 17px; font-weight: 600; color: #fff; letter-spacing: -0.3px; }
+    header h1 a { color: inherit; text-decoration: none; }
+    header h1 a:hover { opacity: 0.85; }
+    .header-tagline {
+      font-size: 11px; color: var(--text-muted);
+      font-weight: 400; letter-spacing: 0.02em;
+    }
+
+    .header-right { display: flex; gap: 10px; align-items: center; }
+    .nav-link {
+      font-size: 12px; color: var(--text-muted); text-decoration: none;
+      padding: 4px 10px; border: 1px solid var(--border); border-radius: var(--radius-sm);
+      transition: color 0.15s, border-color 0.15s;
+    }
+    .nav-link:hover { color: var(--text-secondary); border-color: #3d4268; }
+
+    /* ---------- Layout ---------- */
+    .container { max-width: 720px; margin: 0 auto; padding: var(--space-lg); }
+
+    /* ---------- Back link ---------- */
+    .back-link {
+      display: inline-flex; align-items: center; gap: 6px;
+      font-size: 13px; color: var(--accent-blue); text-decoration: none;
+      margin-bottom: var(--space-lg);
+      transition: opacity 0.15s;
+    }
+    .back-link:hover { opacity: 0.8; }
+
+    /* ---------- Event card ---------- */
+    .event-card {
+      background: var(--bg-card); border: 1px solid var(--border);
+      border-radius: var(--radius-lg); overflow: hidden;
+      box-shadow: var(--shadow-md);
+    }
+
+    .event-card-body { padding: var(--space-lg); }
+
+    .badge-row { display: flex; flex-wrap: wrap; gap: var(--space-sm); margin-bottom: var(--space-md); }
+
+    .badge {
+      display: inline-flex; align-items: center;
+      font-size: 11px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.04em;
+      padding: 3px 10px; border-radius: 20px;
+    }
+    .badge-critical { background: rgba(239,68,68,0.15); color: #f87171; border: 1px solid rgba(239,68,68,0.3); }
+    .badge-major { background: rgba(249,115,22,0.15); color: #fb923c; border: 1px solid rgba(249,115,22,0.3); }
+    .badge-minor { background: rgba(250,204,21,0.15); color: #fde047; border: 1px solid rgba(250,204,21,0.3); }
+    .badge-info { background: rgba(96,165,250,0.15); color: #93bbfd; border: 1px solid rgba(96,165,250,0.3); }
+    .badge-status { background: rgba(148,163,184,0.1); color: var(--text-secondary); border: 1px solid rgba(148,163,184,0.2); }
+    .badge-category { background: rgba(59,130,246,0.1); color: var(--accent-blue); border: 1px solid rgba(59,130,246,0.2); }
+
+    .event-title {
+      font-size: 20px; font-weight: 700; color: #fff;
+      line-height: 1.3; margin-bottom: var(--space-sm);
+    }
+
+    .event-area {
+      display: flex; align-items: center; gap: 6px;
+      font-size: 13px; color: var(--text-secondary);
+      margin-bottom: var(--space-md);
+    }
+    .event-area svg { flex-shrink: 0; }
+
+    .event-time {
+      font-size: 12px; color: var(--text-muted);
+      margin-bottom: var(--space-md);
+      line-height: 1.5;
+    }
+
+    .event-summary {
+      font-size: 15px; color: var(--text-secondary);
+      line-height: 1.6; margin-bottom: var(--space-md);
+    }
+
+    .source-count {
+      font-size: 12px; color: var(--text-muted);
+      padding-top: var(--space-sm);
+      border-top: 1px solid var(--border);
+    }
+    .source-count strong { color: var(--text-secondary); }
+
+    /* ---------- Map ---------- */
+    .event-map-wrap {
+      border-top: 1px solid var(--border);
+    }
+    #event-map { height: 200px; width: 100%; }
+    .leaflet-container { background: var(--bg-base) !important; }
+    .leaflet-control-zoom { border: 1px solid var(--border) !important; border-radius: var(--radius-md) !important; overflow: hidden; }
+    .leaflet-control-zoom a {
+      background: var(--bg-card) !important; color: var(--text-secondary) !important;
+      border-bottom: 1px solid var(--border) !important;
+      width: 30px !important; height: 30px !important; line-height: 30px !important;
+      font-size: 15px !important;
+    }
+    .leaflet-control-zoom a:hover { background: var(--bg-card-hover) !important; color: #fff !important; }
+    .leaflet-control-zoom a:last-child { border-bottom: none !important; }
+    .leaflet-control-attribution {
+      background: rgba(15,17,23,0.7) !important;
+      color: var(--text-muted) !important; font-size: 9px !important;
+      padding: 2px 6px !important;
+    }
+    .leaflet-control-attribution a { color: var(--text-muted) !important; }
+
+    /* ---------- Sources section ---------- */
+    .sources-section {
+      margin-top: var(--space-lg);
+    }
+
+    .section-title {
+      font-size: 14px; font-weight: 600; color: var(--text-secondary);
+      text-transform: uppercase; letter-spacing: 0.05em;
+      margin-bottom: var(--space-md);
+    }
+
+    .source-group-label {
+      font-size: 11px; font-weight: 700; color: var(--text-muted);
+      text-transform: uppercase; letter-spacing: 0.06em;
+      margin-bottom: var(--space-sm); margin-top: var(--space-md);
+    }
+    .source-group-label:first-child { margin-top: 0; }
+
+    .source-card {
+      background: var(--bg-card); border: 1px solid var(--border);
+      border-radius: var(--radius-md); padding: var(--space-md);
+      margin-bottom: var(--space-sm);
+      border-left: 3px solid var(--border);
+      transition: background 0.15s;
+    }
+    .source-card:hover { background: var(--bg-card-hover); }
+    .source-card.type-tweet { border-left-color: #1d9bf0; }
+    .source-card.type-article { border-left-color: #a78bfa; }
+    .source-card.type-telegram { border-left-color: #26a5e4; }
+    .source-card.type-reddit { border-left-color: #ff4500; }
+
+    .source-card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+
+    .source-type-badge {
+      font-size: 10px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.04em; padding: 2px 8px; border-radius: 12px;
+    }
+    .source-type-badge.tweet { background: rgba(29,155,240,0.15); color: #1d9bf0; }
+    .source-type-badge.article { background: rgba(167,139,250,0.15); color: #a78bfa; }
+    .source-type-badge.telegram { background: rgba(38,165,228,0.15); color: #26a5e4; }
+    .source-type-badge.reddit { background: rgba(255,69,0,0.15); color: #ff4500; }
+    .source-type-badge.other { background: rgba(148,163,184,0.1); color: var(--text-secondary); }
+
+    .source-date { font-size: 11px; color: var(--text-muted); }
+
+    .source-text {
+      font-size: 13px; color: var(--text-primary); line-height: 1.5;
+      margin-bottom: 6px;
+      word-break: break-word;
+    }
+
+    .source-link {
+      font-size: 12px; color: var(--accent-blue); text-decoration: none;
+      display: inline-flex; align-items: center; gap: 4px;
+    }
+    .source-link:hover { text-decoration: underline; }
+
+    /* ---------- Share section ---------- */
+    .share-section {
+      margin-top: var(--space-xl);
+      padding: var(--space-lg);
+      background: var(--bg-card); border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+    }
+
+    .share-title {
+      font-size: 13px; font-weight: 600; color: var(--text-secondary);
+      margin-bottom: var(--space-md);
+    }
+
+    .share-buttons { display: flex; gap: var(--space-sm); flex-wrap: wrap; }
+
+    .share-btn {
+      display: inline-flex; align-items: center; gap: 6px;
+      font-size: 12px; font-weight: 600; padding: 8px 16px;
+      border-radius: var(--radius-sm); border: 1px solid var(--border);
+      cursor: pointer; text-decoration: none;
+      transition: all 0.15s;
+    }
+    .share-btn-copy {
+      background: transparent; color: var(--text-secondary);
+    }
+    .share-btn-copy:hover { background: rgba(255,255,255,0.05); color: var(--text-primary); }
+    .share-btn-copy.copied { border-color: var(--success); color: var(--success); }
+
+    .share-btn-x {
+      background: transparent; color: var(--text-secondary);
+    }
+    .share-btn-x:hover { background: rgba(255,255,255,0.05); color: var(--text-primary); }
+
+    /* ---------- Loading skeleton ---------- */
+    .skeleton { animation: shimmer 1.5s infinite; border-radius: var(--radius-sm); }
+    @keyframes shimmer {
+      0% { background: #1e2235; }
+      50% { background: #262a40; }
+      100% { background: #1e2235; }
+    }
+    .skel-badge { width: 70px; height: 22px; display: inline-block; margin-right: 8px; border-radius: 20px; }
+    .skel-title { width: 80%; height: 24px; margin-bottom: 12px; }
+    .skel-area { width: 40%; height: 16px; margin-bottom: 16px; }
+    .skel-line { width: 100%; height: 14px; margin-bottom: 8px; }
+    .skel-line.short { width: 60%; }
+
+    /* ---------- Error ---------- */
+    .error-state {
+      text-align: center; padding: 60px var(--space-lg);
+    }
+    .error-state h2 { font-size: 18px; color: #fff; margin-bottom: 8px; }
+    .error-state p { font-size: 13px; color: var(--text-muted); margin-bottom: var(--space-lg); }
+    .error-state a {
+      color: var(--accent-blue); text-decoration: none;
+      font-size: 13px;
+    }
+    .error-state a:hover { text-decoration: underline; }
+
+    /* ---------- Responsive ---------- */
+    @media (max-width: 768px) {
+      .header-tagline { display: none; }
+      .container { padding: var(--space-md); }
+      .event-card-body { padding: var(--space-md); }
+      .event-title { font-size: 18px; }
+    }
+
+    @media (max-width: 480px) {
+      header { padding: 0 var(--space-md); }
+      .container { padding: var(--space-sm) var(--space-md); }
+      .event-title { font-size: 16px; }
+      .share-buttons { flex-direction: column; }
+      .share-btn { justify-content: center; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="header-left">
+    <h1><a href="/">Lewisham Live</a></h1>
+    <span class="header-tagline">Crime intelligence</span>
+  </div>
+  <div class="header-right">
+    <a href="/" class="nav-link">Home</a>
+    <a href="/" class="nav-link">Events</a>
+  </div>
+</header>
+
+<div class="container">
+  <a href="/" class="back-link">&larr; Back to events</a>
+
+  <div id="content">
+    <!-- Loading skeleton -->
+    <div id="loading" class="event-card">
+      <div class="event-card-body">
+        <div class="badge-row">
+          <span class="skeleton skel-badge"></span>
+          <span class="skeleton skel-badge"></span>
+          <span class="skeleton skel-badge"></span>
+        </div>
+        <div class="skeleton skel-title"></div>
+        <div class="skeleton skel-area"></div>
+        <div class="skeleton skel-line"></div>
+        <div class="skeleton skel-line"></div>
+        <div class="skeleton skel-line short"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+(function () {
+  'use strict';
+
+  var API_BASE = 'https://lewisham-osint-backend.onrender.com';
+
+  // --- Helpers ---
+
+  function esc(str) {
+    if (!str) return '';
+    var d = document.createElement('div');
+    d.appendChild(document.createTextNode(String(str)));
+    return d.innerHTML;
+  }
+
+  function timeAgo(dateStr) {
+    if (!dateStr) return 'Unknown';
+    var d = new Date(dateStr);
+    if (isNaN(d.getTime())) return 'Unknown';
+    var now = Date.now();
+    var diff = Math.floor((now - d.getTime()) / 1000);
+    if (diff < 60) return 'just now';
+    if (diff < 3600) return Math.floor(diff / 60) + 'm ago';
+    if (diff < 86400) return Math.floor(diff / 3600) + 'h ago';
+    if (diff < 604800) return Math.floor(diff / 86400) + 'd ago';
+    return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+  }
+
+  function formatDate(dateStr) {
+    if (!dateStr) return '';
+    var d = new Date(dateStr);
+    if (isNaN(d.getTime())) return '';
+    return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  }
+
+  function sevClass(severity) {
+    var s = (severity || 'info').toLowerCase();
+    if (s === 'critical') return 'badge-critical';
+    if (s === 'major') return 'badge-major';
+    if (s === 'minor') return 'badge-minor';
+    return 'badge-info';
+  }
+
+  function sourceTypeClass(type) {
+    var t = (type || '').toLowerCase();
+    if (t === 'tweet') return 'tweet';
+    if (t === 'article') return 'article';
+    if (t === 'telegram') return 'telegram';
+    if (t === 'reddit') return 'reddit';
+    return 'other';
+  }
+
+  function sourceTypeLabel(type) {
+    var t = (type || '').toLowerCase();
+    if (t === 'tweet') return 'Tweet';
+    if (t === 'article') return 'Article';
+    if (t === 'telegram') return 'Telegram';
+    if (t === 'reddit') return 'Reddit';
+    return type || 'Source';
+  }
+
+  // --- Extract event ID from pathname ---
+
+  function getEventId() {
+    var parts = window.location.pathname.split('/');
+    // expect /event/{id}
+    var idx = parts.indexOf('event');
+    if (idx !== -1 && parts[idx + 1]) {
+      var id = parseInt(parts[idx + 1], 10);
+      if (!isNaN(id) && id > 0) return id;
+    }
+    return null;
+  }
+
+  // --- Render ---
+
+  function renderEvent(event) {
+    // Update page title and OG tags
+    document.title = esc(event.title) + ' \u2014 Lewisham Live';
+
+    var ogTitle = document.querySelector('meta[property="og:title"]');
+    if (ogTitle) ogTitle.setAttribute('content', event.title + ' \u2014 Lewisham Live');
+
+    var ogDesc = document.querySelector('meta[property="og:description"]');
+    if (ogDesc) ogDesc.setAttribute('content', event.summary || 'Event details from Lewisham Live');
+
+    var metaDesc = document.querySelector('meta[name="description"]');
+    if (metaDesc) metaDesc.setAttribute('content', event.summary || 'Event details from Lewisham Live');
+
+    var ogUrl = document.querySelector('meta[property="og:url"]');
+    if (ogUrl) ogUrl.setAttribute('content', window.location.href);
+
+    // Build event card HTML
+    var html = '<div class="event-card">';
+    html += '<div class="event-card-body">';
+
+    // Badges
+    html += '<div class="badge-row">';
+    html += '<span class="badge ' + sevClass(event.severity) + '">' + esc(event.severity) + '</span>';
+    if (event.status) {
+      html += '<span class="badge badge-status">' + esc(event.status) + '</span>';
+    }
+    if (event.category) {
+      html += '<span class="badge badge-category">' + esc(event.category) + '</span>';
+    }
+    html += '</div>';
+
+    // Title
+    html += '<h2 class="event-title">' + esc(event.title) + '</h2>';
+
+    // Area
+    if (event.area_name) {
+      html += '<div class="event-area">';
+      html += '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>';
+      html += esc(event.area_name);
+      html += '</div>';
+    }
+
+    // Time
+    html += '<div class="event-time">';
+    html += 'First reported ' + timeAgo(event.first_reported);
+    if (event.last_updated && event.last_updated !== event.first_reported) {
+      html += ' &middot; Last updated ' + timeAgo(event.last_updated);
+    }
+    html += '</div>';
+
+    // Summary
+    if (event.summary) {
+      html += '<div class="event-summary">' + esc(event.summary) + '</div>';
+    }
+
+    // Source count
+    var sc = event.source_count || (event.sources ? event.sources.length : 0);
+    if (sc > 0) {
+      html += '<div class="source-count">Confirmed by <strong>' + sc + ' source' + (sc !== 1 ? 's' : '') + '</strong></div>';
+    }
+
+    html += '</div>'; // end event-card-body
+
+    // Map
+    if (event.lat && event.lng) {
+      html += '<div class="event-map-wrap"><div id="event-map"></div></div>';
+    }
+
+    html += '</div>'; // end event-card
+
+    // Sources
+    var sources = event.sources || [];
+    if (sources.length > 0) {
+      html += '<div class="sources-section">';
+      html += '<div class="section-title">Linked Sources</div>';
+
+      // Group by type
+      var groups = {};
+      for (var i = 0; i < sources.length; i++) {
+        var s = sources[i];
+        var t = s.source_type || 'other';
+        if (!groups[t]) groups[t] = [];
+        groups[t].push(s);
+      }
+
+      var groupOrder = ['tweet', 'article', 'telegram', 'reddit'];
+      var typeKeys = Object.keys(groups).sort(function (a, b) {
+        var ai = groupOrder.indexOf(a);
+        var bi = groupOrder.indexOf(b);
+        if (ai === -1) ai = 99;
+        if (bi === -1) bi = 99;
+        return ai - bi;
+      });
+
+      for (var g = 0; g < typeKeys.length; g++) {
+        var gType = typeKeys[g];
+        var gSources = groups[gType];
+        html += '<div class="source-group-label">' + esc(sourceTypeLabel(gType)) + 's (' + gSources.length + ')</div>';
+
+        for (var j = 0; j < gSources.length; j++) {
+          var src = gSources[j];
+          html += '<div class="source-card type-' + sourceTypeClass(src.source_type) + '">';
+          html += '<div class="source-card-header">';
+          html += '<span class="source-type-badge ' + sourceTypeClass(src.source_type) + '">';
+          if (src.author) {
+            html += '@' + esc(src.author);
+          } else {
+            html += esc(sourceTypeLabel(src.source_type));
+          }
+          html += '</span>';
+          if (src.source_date || src.added_at) {
+            html += '<span class="source-date">' + formatDate(src.source_date || src.added_at) + '</span>';
+          }
+          html += '</div>';
+
+          if (src.source_title) {
+            html += '<div class="source-text">' + esc(src.source_title) + '</div>';
+          }
+
+          if (src.source_url) {
+            html += '<a class="source-link" href="' + esc(src.source_url) + '" target="_blank" rel="noopener noreferrer">';
+            html += 'View original';
+            html += '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>';
+            html += '</a>';
+          }
+
+          html += '</div>';
+        }
+      }
+
+      html += '</div>';
+    }
+
+    // Share section
+    html += '<div class="share-section">';
+    html += '<div class="share-title">Share this event</div>';
+    html += '<div class="share-buttons">';
+    html += '<button class="share-btn share-btn-copy" onclick="copyLink()" id="copy-btn">';
+    html += '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>';
+    html += 'Copy link';
+    html += '</button>';
+
+    var shareText = encodeURIComponent(event.title + ' \u2014 Lewisham Live');
+    var shareUrl = encodeURIComponent(window.location.href);
+    html += '<a class="share-btn share-btn-x" href="https://twitter.com/intent/tweet?text=' + shareText + '&url=' + shareUrl + '" target="_blank" rel="noopener noreferrer">';
+    html += '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>';
+    html += 'Share on X';
+    html += '</a>';
+    html += '</div></div>';
+
+    document.getElementById('content').innerHTML = html;
+
+    // Init map after DOM update
+    if (event.lat && event.lng) {
+      setTimeout(function () { initMap(event.lat, event.lng, event.title); }, 50);
+    }
+  }
+
+  function renderError(message) {
+    var html = '<div class="error-state">';
+    html += '<h2>Event not found</h2>';
+    html += '<p>' + esc(message || 'This event could not be loaded.') + '</p>';
+    html += '<a href="/">&larr; Back to Lewisham Live</a>';
+    html += '</div>';
+    document.getElementById('content').innerHTML = html;
+  }
+
+  function initMap(lat, lng, title) {
+    var mapEl = document.getElementById('event-map');
+    if (!mapEl) return;
+    var map = L.map('event-map', {
+      center: [lat, lng],
+      zoom: 15,
+      zoomControl: true,
+      scrollWheelZoom: false,
+      dragging: true,
+      attributionControl: true
+    });
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>',
+      subdomains: 'abcd',
+      maxZoom: 19
+    }).addTo(map);
+    L.circleMarker([lat, lng], {
+      radius: 8, fillColor: '#ef4444', color: '#ef4444',
+      weight: 2, opacity: 0.8, fillOpacity: 0.4
+    }).addTo(map).bindTooltip(esc(title || 'Event location'), {
+      permanent: false, direction: 'top',
+      className: 'event-tooltip'
+    });
+  }
+
+  // --- Copy link ---
+
+  window.copyLink = function () {
+    var url = window.location.href;
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(url).then(function () {
+        var btn = document.getElementById('copy-btn');
+        if (btn) {
+          btn.classList.add('copied');
+          btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>Copied!';
+          setTimeout(function () {
+            btn.classList.remove('copied');
+            btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>Copy link';
+          }, 2000);
+        }
+      });
+    } else {
+      // Fallback
+      var ta = document.createElement('textarea');
+      ta.value = url;
+      ta.style.position = 'fixed';
+      ta.style.left = '-9999px';
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+    }
+  };
+
+  // --- Load event ---
+
+  function loadEvent() {
+    var eventId = getEventId();
+    if (!eventId) {
+      renderError('No event ID found in the URL.');
+      return;
+    }
+
+    fetch(API_BASE + '/api/events/' + eventId)
+      .then(function (res) {
+        if (!res.ok) {
+          if (res.status === 404) throw new Error('This event was not found or may have been removed.');
+          throw new Error('Failed to load event (HTTP ' + res.status + ')');
+        }
+        return res.json();
+      })
+      .then(function (json) {
+        if (!json.success || !json.data) {
+          throw new Error(json.error || 'Failed to load event.');
+        }
+        renderEvent(json.data);
+      })
+      .catch(function (err) {
+        renderError(err.message);
+      });
+  }
+
+  loadEvent();
+})();
+</script>
+
+</body>
+</html>

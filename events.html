@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Lewisham Live — Recent Incidents</title>
+  <meta name="description" content="Recent confirmed incidents in Lewisham, South East London. Updated every 5 minutes with live data." />
+  <meta name="keywords" content="Lewisham incidents, Lewisham crime, SE London events, Lewisham safety" />
+  <meta property="og:title" content="Lewisham Live — Recent Incidents" />
+  <meta property="og:description" content="Confirmed incidents in Lewisham from the last 7 days. Live data updated regularly." />
+  <meta property="og:url" content="https://lewishamlive.co.uk/events" />
+  <meta property="og:type" content="website" />
+  <meta name="robots" content="index, follow" />
+  <link rel="canonical" href="https://lewishamlive.co.uk/events" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>
+    :root {
+      --bg-base: #0f1117; --bg-card: #1a1d2e; --bg-card-hover: #1e2235;
+      --border: #2d3148; --border-focus: #3b82f6;
+      --text-primary: #e2e8f0; --text-secondary: #94a3b8; --text-muted: #475569;
+      --accent-blue: #3b82f6; --sev-critical: #ef4444; --sev-major: #f97316; --sev-minor: #facc15; --sev-info: #60a5fa;
+      --success: #4ade80; --danger: #ef4444;
+      --shadow-sm: 0 1px 3px rgba(0,0,0,0.3); --shadow-md: 0 4px 12px rgba(0,0,0,0.4);
+      --radius-sm: 6px; --radius-md: 8px; --radius-lg: 10px;
+      --space-xs: 4px; --space-sm: 8px; --space-md: 16px; --space-lg: 24px; --space-xl: 32px;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: var(--bg-base);
+      color: var(--text-primary);
+      min-height: 100vh;
+    }
+
+    /* ---------- Header ---------- */
+    header {
+      background: var(--bg-card);
+      border-bottom: 1px solid var(--border);
+      padding: 0 var(--space-lg);
+      height: 48px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 1000;
+    }
+
+    .header-left { display: flex; align-items: baseline; gap: var(--space-sm); }
+    header h1 { font-size: 17px; font-weight: 600; color: #fff; letter-spacing: -0.3px; }
+    .header-tagline {
+      font-size: 11px; color: var(--text-muted); font-weight: 400; letter-spacing: 0.02em;
+    }
+
+    .header-right { display: flex; gap: 10px; align-items: center; }
+
+    nav { display: flex; gap: 4px; }
+    nav a {
+      font-size: 12px; font-weight: 500; padding: 6px 12px;
+      border-radius: var(--radius-sm); color: var(--text-secondary);
+      text-decoration: none; transition: color 0.15s, background 0.15s;
+    }
+    nav a:hover { color: var(--text-primary); background: rgba(255,255,255,0.05); }
+    nav a.active { color: var(--accent-blue); background: rgba(59,130,246,0.1); }
+
+    .live-badge {
+      display: flex; align-items: center; gap: 7px; font-size: 12px;
+      color: var(--success); background: rgba(74,222,128,0.1);
+      border: 1px solid rgba(74,222,128,0.2); border-radius: 20px; padding: 5px 12px;
+    }
+    .pulse-dot {
+      width: 7px; height: 7px; border-radius: 50%;
+      background: var(--success); animation: pulse 1.4s infinite;
+    }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.2} }
+
+    /* ---------- Layout ---------- */
+    .container { max-width: 860px; margin: 0 auto; padding: var(--space-lg); }
+
+    /* ---------- Page title ---------- */
+    .page-title { margin-bottom: var(--space-lg); }
+    .page-title h2 { font-size: 22px; font-weight: 700; color: #fff; margin-bottom: 4px; }
+    .page-title p { font-size: 13px; color: var(--text-muted); }
+
+    /* ---------- Stats summary ---------- */
+    .stats-row {
+      display: flex; gap: 12px; margin-bottom: var(--space-lg); flex-wrap: wrap;
+    }
+    .stat-chip {
+      background: var(--bg-card); border: 1px solid var(--border);
+      border-radius: 20px; padding: 6px 16px;
+      font-size: 12px; color: var(--text-secondary);
+      display: flex; align-items: center; gap: 6px;
+    }
+    .stat-chip strong { color: #fff; font-weight: 600; }
+
+    /* ---------- Filters ---------- */
+    .filter-bar {
+      display: flex; gap: 10px; margin-bottom: var(--space-lg); flex-wrap: wrap;
+    }
+    .filter-bar select, .filter-bar input {
+      background: var(--bg-card); border: 1px solid var(--border);
+      border-radius: var(--radius-sm); padding: 8px 12px;
+      font-size: 13px; color: var(--text-primary);
+      outline: none; transition: border-color 0.15s;
+      font-family: inherit;
+    }
+    .filter-bar select { min-width: 130px; cursor: pointer; }
+    .filter-bar select option { background: var(--bg-card); color: var(--text-primary); }
+    .filter-bar input { flex: 1; min-width: 180px; }
+    .filter-bar select:focus, .filter-bar input:focus {
+      border-color: var(--border-focus);
+    }
+
+    /* ---------- Event cards ---------- */
+    .events-list { display: flex; flex-direction: column; gap: 10px; }
+
+    .event-card {
+      display: flex; background: var(--bg-card); border: 1px solid var(--border);
+      border-radius: var(--radius-lg); overflow: hidden;
+      transition: background 0.15s, box-shadow 0.15s, transform 0.15s;
+      cursor: pointer; text-decoration: none; color: inherit;
+    }
+    .event-card:hover {
+      background: var(--bg-card-hover); box-shadow: var(--shadow-md);
+      transform: translateY(-1px);
+    }
+
+    .sev-accent {
+      width: 3px; flex-shrink: 0;
+    }
+    .sev-accent.critical { background: var(--sev-critical); }
+    .sev-accent.major { background: var(--sev-major); }
+    .sev-accent.minor { background: var(--sev-minor); }
+    .sev-accent.info { background: var(--sev-info); }
+
+    .event-body {
+      flex: 1; padding: 14px 16px; min-width: 0;
+    }
+    .event-title {
+      font-size: 15px; font-weight: 600; color: #fff;
+      margin-bottom: 6px; line-height: 1.3;
+    }
+    .event-summary {
+      font-size: 13px; color: var(--text-secondary); line-height: 1.5;
+      display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical;
+      overflow: hidden; margin-bottom: 10px;
+    }
+    .event-meta {
+      display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
+    }
+    .sev-badge {
+      font-size: 10px; font-weight: 700; text-transform: uppercase;
+      padding: 2px 8px; border-radius: 10px; letter-spacing: 0.04em;
+    }
+    .sev-badge.critical { background: rgba(239,68,68,0.15); color: var(--sev-critical); }
+    .sev-badge.major { background: rgba(249,115,22,0.15); color: var(--sev-major); }
+    .sev-badge.minor { background: rgba(250,204,21,0.15); color: var(--sev-minor); }
+    .sev-badge.info { background: rgba(96,165,250,0.15); color: var(--sev-info); }
+
+    .meta-tag {
+      font-size: 11px; color: var(--text-muted);
+    }
+    .meta-sep { color: var(--border); font-size: 10px; }
+
+    /* ---------- Load more ---------- */
+    .load-more-wrap { text-align: center; margin-top: var(--space-lg); }
+    .load-more-btn {
+      font-size: 13px; font-weight: 500; padding: 10px 28px;
+      border: 1px solid var(--border); border-radius: var(--radius-md);
+      background: var(--bg-card); color: var(--text-secondary);
+      cursor: pointer; transition: color 0.15s, border-color 0.15s, background 0.15s;
+      font-family: inherit;
+    }
+    .load-more-btn:hover { color: var(--text-primary); border-color: #3d4268; background: var(--bg-card-hover); }
+    .load-more-btn:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 2px; }
+    .load-more-btn:disabled { opacity: 0.4; cursor: default; }
+
+    /* ---------- Empty / error ---------- */
+    .empty-state {
+      text-align: center; padding: 60px 20px; color: var(--text-muted); font-size: 14px;
+    }
+    .empty-state .icon { font-size: 36px; margin-bottom: 12px; display: block; }
+
+    .error-banner {
+      background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.25);
+      border-radius: var(--radius-md); padding: 10px 16px; margin-bottom: var(--space-md);
+      font-size: 13px; color: var(--danger); display: none;
+    }
+
+    /* ---------- Loading skeleton ---------- */
+    .skeleton-card {
+      background: var(--bg-card); border: 1px solid var(--border);
+      border-radius: var(--radius-lg); padding: 16px; margin-bottom: 10px;
+    }
+    .skeleton-line {
+      height: 12px; border-radius: 4px; background: var(--border);
+      animation: shimmer 1.2s infinite;
+    }
+    .skeleton-line.w60 { width: 60%; margin-bottom: 10px; height: 16px; }
+    .skeleton-line.w90 { width: 90%; margin-bottom: 6px; }
+    .skeleton-line.w40 { width: 40%; margin-top: 8px; }
+    @keyframes shimmer { 0%,100%{opacity:0.4} 50%{opacity:0.7} }
+
+    /* ---------- Refresh indicator ---------- */
+    .refresh-bar {
+      font-size: 11px; color: var(--text-muted); text-align: center;
+      padding: 12px 0; margin-top: var(--space-md);
+    }
+
+    /* ---------- Mobile ---------- */
+    @media (max-width: 600px) {
+      .container { padding: var(--space-md); }
+      .page-title h2 { font-size: 19px; }
+      .filter-bar { flex-direction: column; }
+      .filter-bar select, .filter-bar input { width: 100%; min-width: 0; }
+      .stats-row { gap: 8px; }
+      header { padding: 0 var(--space-md); }
+      .header-tagline { display: none; }
+      nav a { font-size: 11px; padding: 5px 8px; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="header-left">
+    <h1>Lewisham Live</h1>
+    <span class="header-tagline">SE London intelligence</span>
+  </div>
+  <div class="header-right">
+    <nav>
+      <a href="/">Home</a>
+      <a href="/events" class="active">Events</a>
+      <a href="/briefings">Briefings</a>
+    </nav>
+    <div class="live-badge"><span class="pulse-dot"></span> Live</div>
+  </div>
+</header>
+
+<main class="container">
+  <div class="page-title">
+    <h2>Recent Incidents</h2>
+    <p>Confirmed events from the last 7 days</p>
+  </div>
+
+  <div class="stats-row" id="statsRow">
+    <div class="stat-chip"><strong id="statWeek">--</strong> events this week</div>
+    <div class="stat-chip"><strong id="statToday">--</strong> today</div>
+  </div>
+
+  <div class="error-banner" id="errorBanner"></div>
+
+  <div class="filter-bar">
+    <select id="filterSeverity" aria-label="Filter by severity">
+      <option value="">All severities</option>
+      <option value="critical">Critical</option>
+      <option value="major">Major</option>
+      <option value="minor">Minor</option>
+      <option value="info">Info</option>
+    </select>
+    <select id="filterCategory" aria-label="Filter by category">
+      <option value="">All categories</option>
+    </select>
+    <input type="search" id="filterSearch" placeholder="Search incidents..." aria-label="Search incidents" />
+  </div>
+
+  <div class="events-list" id="eventsList"></div>
+
+  <div class="load-more-wrap" id="loadMoreWrap" style="display:none;">
+    <button class="load-more-btn" id="loadMoreBtn">Load more</button>
+  </div>
+
+  <div class="refresh-bar" id="refreshBar">Auto-refreshes every 5 minutes</div>
+</main>
+
+<script>
+(function() {
+  'use strict';
+
+  const API = 'https://lewisham-osint-backend.onrender.com';
+  const PAGE_SIZE = 20;
+  const REFRESH_MS = 5 * 60 * 1000;
+
+  let allEvents = [];
+  let displayCount = PAGE_SIZE;
+  let refreshTimer = null;
+
+  const $ = (s) => document.getElementById(s);
+
+  // --- HTML escape ---
+  function esc(str) {
+    if (!str) return '';
+    const el = document.createElement('span');
+    el.textContent = String(str);
+    return el.innerHTML;
+  }
+
+  // --- Time ago ---
+  function timeAgo(dateStr) {
+    if (!dateStr) return '';
+    const diff = Date.now() - new Date(dateStr).getTime();
+    const mins = Math.floor(diff / 60000);
+    if (mins < 1) return 'just now';
+    if (mins < 60) return mins + 'm ago';
+    const hrs = Math.floor(mins / 60);
+    if (hrs < 24) return hrs + 'h ago';
+    const days = Math.floor(hrs / 24);
+    return days + 'd ago';
+  }
+
+  // --- Severity class ---
+  function sevClass(sev) {
+    if (!sev) return 'info';
+    const s = sev.toLowerCase();
+    if (s === 'critical') return 'critical';
+    if (s === 'major') return 'major';
+    if (s === 'minor') return 'minor';
+    return 'info';
+  }
+
+  // --- Render skeleton ---
+  function showSkeleton() {
+    let html = '';
+    for (let i = 0; i < 5; i++) {
+      html += '<div class="skeleton-card"><div class="skeleton-line w60"></div><div class="skeleton-line w90"></div><div class="skeleton-line w90"></div><div class="skeleton-line w40"></div></div>';
+    }
+    $('eventsList').innerHTML = html;
+  }
+
+  // --- Render events ---
+  function renderEvents() {
+    const sev = $('filterSeverity').value.toLowerCase();
+    const cat = $('filterCategory').value.toLowerCase();
+    const q = $('filterSearch').value.toLowerCase().trim();
+
+    let filtered = allEvents.filter(function(e) {
+      if (sev && (e.severity || '').toLowerCase() !== sev) return false;
+      if (cat && (e.category || '').toLowerCase() !== cat) return false;
+      if (q) {
+        var haystack = ((e.title || '') + ' ' + (e.summary || '') + ' ' + (e.area_name || '')).toLowerCase();
+        if (haystack.indexOf(q) === -1) return false;
+      }
+      return true;
+    });
+
+    if (filtered.length === 0) {
+      $('eventsList').innerHTML = '<div class="empty-state"><span class="icon">&#128269;</span>No incidents match your filters.</div>';
+      $('loadMoreWrap').style.display = 'none';
+      return;
+    }
+
+    var visible = filtered.slice(0, displayCount);
+    var html = '';
+    for (var i = 0; i < visible.length; i++) {
+      var e = visible[i];
+      var sc = sevClass(e.severity);
+      html += '<a class="event-card" href="/event/' + esc(e.id) + '">'
+        + '<div class="sev-accent ' + sc + '"></div>'
+        + '<div class="event-body">'
+        + '<div class="event-title">' + esc(e.title) + '</div>'
+        + '<div class="event-summary">' + esc(e.summary) + '</div>'
+        + '<div class="event-meta">'
+        + '<span class="sev-badge ' + sc + '">' + esc(e.severity || 'info') + '</span>'
+        + (e.category ? '<span class="meta-sep">&#183;</span><span class="meta-tag">' + esc(e.category) + '</span>' : '')
+        + (e.area_name ? '<span class="meta-sep">&#183;</span><span class="meta-tag">' + esc(e.area_name) + '</span>' : '')
+        + (e.source_count ? '<span class="meta-sep">&#183;</span><span class="meta-tag">' + esc(e.source_count) + ' source' + (e.source_count !== 1 ? 's' : '') + '</span>' : '')
+        + '<span class="meta-sep">&#183;</span><span class="meta-tag">' + esc(timeAgo(e.last_updated || e.first_reported)) + '</span>'
+        + '</div></div></a>';
+    }
+    $('eventsList').innerHTML = html;
+
+    if (filtered.length > displayCount) {
+      $('loadMoreWrap').style.display = '';
+      $('loadMoreBtn').textContent = 'Load more (' + (filtered.length - displayCount) + ' remaining)';
+      $('loadMoreBtn').disabled = false;
+    } else {
+      $('loadMoreWrap').style.display = 'none';
+    }
+  }
+
+  // --- Populate category dropdown ---
+  function populateCategories(events) {
+    var cats = {};
+    for (var i = 0; i < events.length; i++) {
+      var c = events[i].category;
+      if (c) cats[c.toLowerCase()] = c;
+    }
+    var sel = $('filterCategory');
+    // Keep first option
+    sel.innerHTML = '<option value="">All categories</option>';
+    var sorted = Object.keys(cats).sort();
+    for (var j = 0; j < sorted.length; j++) {
+      var opt = document.createElement('option');
+      opt.value = sorted[j];
+      opt.textContent = cats[sorted[j]];
+      sel.appendChild(opt);
+    }
+  }
+
+  // --- Update stats ---
+  function updateStats(events) {
+    var now = new Date();
+    var todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    var todayCount = 0;
+    for (var i = 0; i < events.length; i++) {
+      var t = new Date(events[i].last_updated || events[i].first_reported).getTime();
+      if (t >= todayStart) todayCount++;
+    }
+    $('statWeek').textContent = events.length;
+    $('statToday').textContent = todayCount;
+  }
+
+  // --- Show error ---
+  function showError(msg) {
+    var el = $('errorBanner');
+    el.textContent = msg;
+    el.style.display = '';
+  }
+
+  function hideError() {
+    $('errorBanner').style.display = 'none';
+  }
+
+  // --- Fetch events ---
+  function fetchEvents() {
+    hideError();
+    var isFirstLoad = allEvents.length === 0;
+    if (isFirstLoad) showSkeleton();
+
+    fetch(API + '/api/events/public')
+      .then(function(res) {
+        if (!res.ok) throw new Error('Server error (' + res.status + ')');
+        return res.json();
+      })
+      .then(function(json) {
+        if (!json.success) throw new Error('API returned failure');
+        allEvents = json.data || [];
+        populateCategories(allEvents);
+        updateStats(allEvents);
+        renderEvents();
+
+        var now = new Date();
+        $('refreshBar').textContent = 'Last updated ' + now.toLocaleTimeString() + ' — auto-refreshes every 5 minutes';
+      })
+      .catch(function(err) {
+        if (isFirstLoad) {
+          $('eventsList').innerHTML = '<div class="empty-state"><span class="icon">&#9888;&#65039;</span>Unable to load incidents. Retrying shortly.</div>';
+        }
+        showError('Failed to load events: ' + esc(err.message));
+      });
+  }
+
+  // --- Event listeners ---
+  $('filterSeverity').addEventListener('change', function() { displayCount = PAGE_SIZE; renderEvents(); });
+  $('filterCategory').addEventListener('change', function() { displayCount = PAGE_SIZE; renderEvents(); });
+
+  var searchTimeout = null;
+  $('filterSearch').addEventListener('input', function() {
+    clearTimeout(searchTimeout);
+    searchTimeout = setTimeout(function() { displayCount = PAGE_SIZE; renderEvents(); }, 200);
+  });
+
+  $('loadMoreBtn').addEventListener('click', function() {
+    displayCount += PAGE_SIZE;
+    renderEvents();
+  });
+
+  // --- Init ---
+  fetchEvents();
+  refreshTimer = setInterval(fetchEvents, REFRESH_MS);
+})();
+</script>
+
+</body>
+</html>
