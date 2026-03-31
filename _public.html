@@ -11,6 +11,8 @@
   <meta property="og:url" content="https://lewishamlive.co.uk" />
   <meta name="robots" content="index, follow" />
   <link rel="canonical" href="https://lewishamlive.co.uk" />
+  <link rel="manifest" href="/manifest.json">
+  <meta name="theme-color" content="#0f1117">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-3985328738392525"
      crossorigin="anonymous"></script>
@@ -465,6 +467,38 @@
     </div>
   </div>
 
+<div class="card" style="margin-top:16px;">
+  <div class="card-header">
+    <h2>Report an Incident</h2>
+  </div>
+  <div style="padding:16px 20px;">
+    <p style="font-size:12px;color:var(--text-muted);margin-bottom:12px;">Witnessed something? Help keep Lewisham informed. Your report will be reviewed and may appear in our intelligence feed.</p>
+    <form id="report-form">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
+        <input type="text" id="report-location" placeholder="Location (e.g. Lewisham High St)" style="padding:8px 12px;background:var(--bg-base);border:1px solid var(--border);border-radius:var(--radius-md);color:var(--text-primary);font-size:12px;" />
+        <select id="report-category" style="padding:8px 12px;background:var(--bg-base);border:1px solid var(--border);border-radius:var(--radius-md);color:var(--text-primary);font-size:12px;">
+          <option value="other">Category</option>
+          <option value="assault">Assault</option>
+          <option value="robbery">Robbery</option>
+          <option value="asb">Anti-social behaviour</option>
+          <option value="fire">Fire</option>
+          <option value="rtc">Road collision</option>
+          <option value="drugs">Drugs</option>
+          <option value="theft">Theft</option>
+          <option value="missing-person">Missing person</option>
+          <option value="other">Other</option>
+        </select>
+      </div>
+      <textarea id="report-description" placeholder="What happened? Provide as much detail as you can..." required minlength="10" maxlength="2000" style="width:100%;padding:8px 12px;background:var(--bg-base);border:1px solid var(--border);border-radius:var(--radius-md);color:var(--text-primary);font-size:12px;min-height:80px;resize:vertical;font-family:inherit;margin-bottom:8px;"></textarea>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <input type="email" id="report-email" placeholder="Email (optional, for follow-up)" style="flex:1;padding:8px 12px;background:var(--bg-base);border:1px solid var(--border);border-radius:var(--radius-md);color:var(--text-primary);font-size:12px;" />
+        <button type="submit" id="report-btn" style="padding:8px 16px;background:var(--sev-major);color:#fff;border:none;border-radius:var(--radius-md);font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;">Submit Report</button>
+      </div>
+      <div id="report-msg" style="font-size:11px;margin-top:8px;display:none;"></div>
+    </form>
+  </div>
+</div>
+
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -885,6 +919,40 @@
       msg.textContent = 'Connection error. Try again.';
       msg.style.color = '#ef4444';
       btn.textContent = 'Subscribe'; btn.disabled = false;
+    }
+    msg.style.display = 'block';
+  });
+
+  document.getElementById('report-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const btn = document.getElementById('report-btn');
+    const msg = document.getElementById('report-msg');
+    btn.disabled = true; btn.textContent = 'Submitting...';
+    try {
+      const r = await fetch(BASE + '/api/report', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          description: document.getElementById('report-description').value.trim(),
+          location: document.getElementById('report-location').value.trim(),
+          category: document.getElementById('report-category').value,
+          contactEmail: document.getElementById('report-email').value.trim(),
+        })
+      });
+      const json = await r.json();
+      if (json.success) {
+        msg.textContent = 'Report submitted successfully. Thank you for helping keep Lewisham safe.';
+        msg.style.color = '#4ade80';
+        document.getElementById('report-form').reset();
+        btn.textContent = 'Submitted';
+      } else {
+        msg.textContent = json.error || 'Failed to submit.';
+        msg.style.color = '#ef4444';
+        btn.textContent = 'Submit Report'; btn.disabled = false;
+      }
+    } catch {
+      msg.textContent = 'Connection error. Try again.';
+      msg.style.color = '#ef4444';
+      btn.textContent = 'Submit Report'; btn.disabled = false;
     }
     msg.style.display = 'block';
   });
