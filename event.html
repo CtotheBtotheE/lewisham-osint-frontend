@@ -419,6 +419,11 @@
     var ogUrl = document.querySelector('meta[property="og:url"]');
     if (ogUrl) ogUrl.setAttribute('content', window.location.href);
 
+    // Set OG image
+    var ogImg = document.querySelector('meta[property="og:image"]');
+    if (!ogImg) { ogImg = document.createElement('meta'); ogImg.setAttribute('property', 'og:image'); document.head.appendChild(ogImg); }
+    ogImg.content = API_BASE + '/api/og-image/' + event.id;
+
     // Build event card HTML
     var html = '<div class="event-card">';
     html += '<div class="event-card-body">';

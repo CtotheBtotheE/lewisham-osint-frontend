@@ -167,6 +167,86 @@
     }
     .meta-sep { color: var(--border); font-size: 10px; }
 
+    /* ---------- View toggle ---------- */
+    .view-toggle { margin-left: auto; }
+    .view-btn {
+      font-size: 10px; padding: 4px 10px; border-radius: 20px;
+      border: 1px solid var(--border); background: transparent; color: var(--text-muted);
+      cursor: pointer; transition: all 0.15s; font-family: inherit;
+    }
+    .view-btn:hover { border-color: #475569; color: var(--text-secondary); }
+    .view-btn.active { background: var(--accent-blue); color: #fff; border-color: var(--accent-blue); }
+
+    /* ---------- Timeline ---------- */
+    .timeline { position: relative; padding-left: 30px; }
+    .timeline::before {
+      content: '';
+      position: absolute;
+      left: 12px; top: 0; bottom: 0;
+      width: 2px;
+      background: var(--border);
+    }
+    .timeline-item {
+      position: relative;
+      padding: 12px 16px;
+      margin-bottom: 12px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      cursor: pointer;
+      transition: all 0.15s;
+      text-decoration: none;
+      color: inherit;
+      display: block;
+    }
+    .timeline-item:hover { background: var(--bg-card-hover); box-shadow: var(--shadow-sm); }
+    .timeline-dot {
+      position: absolute;
+      left: -24px; top: 16px;
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      border: 2px solid var(--bg-base);
+    }
+    .timeline-date {
+      font-size: 10px;
+      color: var(--text-muted);
+      margin-bottom: 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .timeline-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text-primary);
+      margin-bottom: 4px;
+    }
+    .timeline-meta {
+      display: flex;
+      gap: 8px;
+      font-size: 10px;
+      color: var(--text-muted);
+      flex-wrap: wrap;
+    }
+    .timeline-summary {
+      font-size: 12px;
+      color: var(--text-secondary);
+      margin-top: 6px;
+      line-height: 1.5;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+    .timeline-day-label {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--accent-blue);
+      margin-bottom: 8px;
+      margin-top: 16px;
+      padding-left: 4px;
+    }
+    .timeline-day-label:first-child { margin-top: 0; }
+
     /* ---------- Load more ---------- */
     .load-more-wrap { text-align: center; margin-top: var(--space-lg); }
     .load-more-btn {
@@ -278,6 +358,10 @@
       <option value="">All categories</option>
     </select>
     <input type="search" id="filterSearch" placeholder="Search incidents..." aria-label="Search incidents" />
+    <div class="view-toggle" style="display:flex;gap:4px;">
+      <button class="view-btn active" id="view-cards" onclick="setView('cards')">Cards</button>
+      <button class="view-btn" id="view-timeline" onclick="setView('timeline')">Timeline</button>
+    </div>
   </div>
 
   <div class="events-list" id="eventsList"></div>
@@ -300,6 +384,7 @@
   let allEvents = [];
   let displayCount = PAGE_SIZE;
   let refreshTimer = null;
+  let currentView = 'cards';
 
   const $ = (s) => document.getElementById(s);
 
@@ -343,13 +428,13 @@
     $('eventsList').innerHTML = html;
   }
 
-  // --- Render events ---
-  function renderEvents() {
+  // --- Get filtered events ---
+  function getFilteredEvents() {
     const sev = $('filterSeverity').value.toLowerCase();
     const cat = $('filterCategory').value.toLowerCase();
     const q = $('filterSearch').value.toLowerCase().trim();
 
-    let filtered = allEvents.filter(function(e) {
+    return allEvents.filter(function(e) {
       if (sev && (e.severity || '').toLowerCase() !== sev) return false;
       if (cat && (e.category || '').toLowerCase() !== cat) return false;
       if (q) {
@@ -358,6 +443,17 @@
       }
       return true;
     });
+  }
+
+  // --- Render current view ---
+  function renderCurrentView() {
+    if (currentView === 'timeline') renderTimeline();
+    else renderCards();
+  }
+
+  // --- Render cards (original view) ---
+  function renderCards() {
+    var filtered = getFilteredEvents();
 
     if (filtered.length === 0) {
       $('eventsList').innerHTML = '<div class="empty-state"><span class="icon">&#128269;</span>No incidents match your filters.</div>';
@@ -392,6 +488,60 @@
     } else {
       $('loadMoreWrap').style.display = 'none';
     }
+  }
+
+  // --- Render timeline view ---
+  function renderTimeline() {
+    var filtered = getFilteredEvents();
+
+    if (filtered.length === 0) {
+      $('eventsList').innerHTML = '<div class="empty-state"><span class="icon">&#128269;</span>No incidents match your filters.</div>';
+      $('loadMoreWrap').style.display = 'none';
+      return;
+    }
+
+    var sevColor = { critical: '#ef4444', major: '#f97316', minor: '#facc15', info: '#60a5fa' };
+
+    // Group by day
+    var grouped = {};
+    var dayOrder = [];
+    filtered.forEach(function(ev) {
+      var day = new Date(ev.last_updated || ev.first_reported).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' });
+      if (!grouped[day]) { grouped[day] = []; dayOrder.push(day); }
+      grouped[day].push(ev);
+    });
+
+    var html = '<div class="timeline">';
+    for (var d = 0; d < dayOrder.length; d++) {
+      var day = dayOrder[d];
+      var dayEvents = grouped[day];
+      html += '<div class="timeline-day-label">' + esc(day) + '</div>';
+      for (var i = 0; i < dayEvents.length; i++) {
+        var ev = dayEvents[i];
+        var color = sevColor[(ev.severity || '').toLowerCase()] || '#60a5fa';
+        var time = new Date(ev.last_updated || ev.first_reported).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+        html += '<a class="timeline-item" href="/event/' + esc(ev.id) + '">'
+          + '<div class="timeline-dot" style="background:' + color + ';"></div>'
+          + '<div class="timeline-date">' + esc(time) + '</div>'
+          + '<div class="timeline-title">' + esc(ev.title) + '</div>'
+          + '<div class="timeline-meta">'
+          + '<span style="color:' + color + ';font-weight:700;text-transform:uppercase;">' + esc(ev.severity || 'info') + '</span>'
+          + '<span>' + esc(ev.category || '') + '</span>'
+          + '<span>' + esc(ev.area_name || '') + '</span>'
+          + '<span>' + (ev.source_count || 0) + ' source' + (ev.source_count !== 1 ? 's' : '') + '</span>'
+          + '</div>'
+          + '<div class="timeline-summary">' + esc((ev.summary || '').slice(0, 200)) + '</div>'
+          + '</a>';
+      }
+    }
+    html += '</div>';
+    $('eventsList').innerHTML = html;
+    $('loadMoreWrap').style.display = 'none';
+  }
+
+  // --- Legacy alias ---
+  function renderEvents() {
+    renderCurrentView();
   }
 
   // --- Populate category dropdown ---
@@ -465,6 +615,15 @@
         showError('Failed to load events: ' + esc(err.message));
       });
   }
+
+  // --- View toggle (exposed globally for onclick) ---
+  window.setView = function(view) {
+    currentView = view;
+    document.getElementById('view-cards').classList.toggle('active', view === 'cards');
+    document.getElementById('view-timeline').classList.toggle('active', view === 'timeline');
+    displayCount = PAGE_SIZE;
+    renderCurrentView();
+  };
 
   // --- Event listeners ---
   $('filterSeverity').addEventListener('change', function() { displayCount = PAGE_SIZE; renderEvents(); });

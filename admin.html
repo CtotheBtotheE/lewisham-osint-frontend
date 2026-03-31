@@ -630,6 +630,7 @@
   </div>
   <nav class="header-nav">
     <a href="/admin/database" class="nav-pill" style="text-decoration:none;">Database</a>
+    <button id="btn-notify" onclick="enableNotifications()" class="nav-pill" style="font-size:10px;">Enable Alerts</button>
     <button class="nav-pill active" onclick="loadAll()">Refresh</button>
     <button class="nav-pill danger" onclick="logout()">Logout</button>
   </nav>
@@ -1209,6 +1210,82 @@
     } catch { btn.textContent = 'Error'; btn.disabled = false; }
   }
 
+  let lastKnownEventIds = new Set();
+  let notificationsEnabled = false;
+
+  async function checkNewCriticalEvents() {
+    try {
+      const r = await fetch(`${BASE}/api/events?status=confirmed`, FETCH_OPTS);
+      const json = await r.json();
+      const events = json.data || [];
+
+      if (lastKnownEventIds.size === 0) {
+        // First load — just record IDs
+        events.forEach(e => lastKnownEventIds.add(e.id));
+        return;
+      }
+
+      const newCritical = events.filter(e =>
+        !lastKnownEventIds.has(e.id) && (e.severity === 'critical' || e.severity === 'major')
+      );
+
+      events.forEach(e => lastKnownEventIds.add(e.id));
+
+      if (newCritical.length > 0 && notificationsEnabled) {
+        // Play notification sound (short beep using Web Audio API)
+        playAlertSound();
+
+        // Show desktop notification
+        if (Notification.permission === 'granted') {
+          newCritical.forEach(ev => {
+            new Notification('Lewisham Live — ' + ev.severity.toUpperCase(), {
+              body: ev.title,
+              icon: '/icon-192.png',
+              tag: 'event-' + ev.id,
+            });
+          });
+        }
+
+        // Show toast
+        newCritical.forEach(ev => {
+          showToast(`NEW ${ev.severity.toUpperCase()}: ${ev.title}`, 'error');
+        });
+      }
+    } catch {}
+  }
+
+  function playAlertSound() {
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.frequency.value = 880;
+      osc.type = 'sine';
+      gain.gain.value = 0.1;
+      osc.start();
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
+      osc.stop(ctx.currentTime + 0.3);
+    } catch {}
+  }
+
+  function enableNotifications() {
+    notificationsEnabled = true;
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission();
+    }
+    const btn = document.getElementById('btn-notify');
+    if (btn) {
+      btn.textContent = 'Notifications ON';
+      btn.style.color = '#4ade80';
+      btn.style.borderColor = '#4ade80';
+    }
+    showToast('Critical event notifications enabled', 'success');
+  }
+
+  setInterval(checkNewCriticalEvents, 120000);
+
   async function loadAll() {
     document.getElementById('m-time').textContent = new Date().toLocaleTimeString('en-GB', { hour:'2-digit', minute:'2-digit' });
     loadFeed();
@@ -1216,6 +1293,7 @@
     loadPipelineStats();
     loadAnalytics();
     loadWeekSummary();
+    checkNewCriticalEvents();
   }
 
   window.addEventListener('load', () => {
