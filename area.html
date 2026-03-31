@@ -200,6 +200,12 @@
     View on map
   </a>
 
+  <!-- Category breakdown -->
+  <div id="category-breakdown" style="display:none;margin-bottom:16px;">
+    <div style="font-size:11px;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px;font-weight:500;">Category Breakdown</div>
+    <div id="category-bars" style="display:flex;flex-direction:column;gap:4px;"></div>
+  </div>
+
   <div class="events-list" id="eventsList"></div>
 </main>
 
@@ -283,6 +289,27 @@
       document.getElementById('statMajWrap').style.display = '';
     }
 
+    // Category breakdown
+    var cats = {};
+    for (var ci = 0; ci < events.length; ci++) {
+      var cat = events[ci].category || 'other';
+      cats[cat] = (cats[cat] || 0) + 1;
+    }
+    var catEntries = Object.entries(cats).sort(function(a, b) { return b[1] - a[1]; });
+    if (catEntries.length > 0) {
+      var maxCat = catEntries[0][1];
+      var catColors = { stabbing:'#ef4444', shooting:'#ef4444', assault:'#f97316', robbery:'#f97316', fire:'#ef4444', burglary:'#facc15', theft:'#facc15', drugs:'#c084fc', asb:'#60a5fa', rtc:'#f97316' };
+      document.getElementById('category-bars').innerHTML = catEntries.slice(0, 8).map(function(e) {
+        var pct = (e[1] / maxCat) * 100;
+        var color = catColors[e[0]] || '#3b82f6';
+        return '<div style="display:flex;align-items:center;gap:8px;font-size:11px;">'
+          + '<span style="width:100px;color:var(--text-secondary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex-shrink:0;">' + esc(e[0]) + '</span>'
+          + '<div style="flex:1;height:6px;background:rgba(255,255,255,0.05);border-radius:3px;overflow:hidden;"><div style="height:100%;width:' + pct + '%;background:' + color + ';border-radius:3px;transition:width 0.5s;"></div></div>'
+          + '<span style="width:24px;text-align:right;color:var(--text-muted);font-size:10px;">' + e[1] + '</span></div>';
+      }).join('');
+      document.getElementById('category-breakdown').style.display = '';
+    }
+
     // Map link
     document.getElementById('mapLink').style.display = '';
     document.getElementById('mapLink').href = '/?area=' + encodeURIComponent(areaName);
@@ -320,7 +347,10 @@
     showSkeleton();
 
     fetch(API + '/api/areas/' + encodeURIComponent(areaName))
-      .then(function(res) { return res.json(); })
+      .then(function(res) {
+        if (!res.ok) throw new Error('Server error (' + res.status + ')');
+        return res.json();
+      })
       .then(function(json) {
         render(json.data || [], json.area || areaName);
       })
