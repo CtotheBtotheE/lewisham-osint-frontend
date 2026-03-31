@@ -567,6 +567,8 @@
         <option value="resolved">Resolved</option>
       </select>
       <button class="action-btn" onclick="runPipeline()" style="border-color:#f97316;color:#f97316;">Run Pipeline</button>
+      <button class="action-btn" onclick="generateBriefing('daily')" id="btn-daily" style="border-color:#c084fc;color:#c084fc;">Daily Briefing</button>
+      <button class="action-btn" onclick="generateBriefing('weekly')" id="btn-weekly" style="border-color:#3b82f6;color:#3b82f6;">Weekly Report</button>
       <button class="action-btn" onclick="openCleanseModal()" style="border-color:#ef4444;color:#ef4444;">Cleanse Data</button>
       <span style="font-size:11px;color:#475569;" id="events-count"></span>
     </div>
@@ -1513,6 +1515,25 @@ async function runPipeline() {
     const json = await r.json();
     if (btn) btn.textContent = `Done: ${json.stats?.newEvents || 0} new, ${json.stats?.updatedEvents || 0} updated`;
     setTimeout(() => { if (btn) { btn.textContent = 'Run Pipeline'; btn.disabled = false; } loadEvents(); }, 2000);
+  } catch { if (btn) { btn.textContent = 'Error'; btn.disabled = false; } }
+}
+
+async function generateBriefing(type) {
+  const btnId = type === 'weekly' ? 'btn-weekly' : 'btn-daily';
+  const btn = document.getElementById(btnId);
+  const label = type === 'weekly' ? 'Weekly Report' : 'Daily Briefing';
+  const endpoint = type === 'weekly' ? '/api/briefings/weekly' : '/api/briefings/generate';
+  if (btn) { btn.disabled = true; btn.textContent = 'Generating...'; }
+  try {
+    const r = await fetch(`${BASE}${endpoint}`, postOpts());
+    const json = await r.json();
+    if (json.success && json.briefing) {
+      if (btn) btn.textContent = `Done (${json.eventCount} events)`;
+      if (typeof showToast === 'function') showToast(`${label} generated from ${json.eventCount} events`, 'success');
+    } else {
+      if (btn) btn.textContent = json.message || 'No events';
+    }
+    setTimeout(() => { if (btn) { btn.textContent = label; btn.disabled = false; } }, 3000);
   } catch { if (btn) { btn.textContent = 'Error'; btn.disabled = false; } }
 }
 
