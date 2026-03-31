@@ -659,6 +659,11 @@
       <div class="metric-sub">DLR &middot; Overground &middot; Bus</div>
     </div>
     <div class="metric">
+      <div class="metric-label">Subscribers</div>
+      <div class="metric-value" id="m-subs">0</div>
+      <div class="metric-sub">Email alerts</div>
+    </div>
+    <div class="metric">
       <div class="metric-label">Last updated</div>
       <div class="metric-value" style="font-size:16px;padding-top:5px;" id="m-time">&mdash;</div>
       <div class="metric-sub">Auto-refresh every 5 min</div>
@@ -712,6 +717,23 @@
       <div class="status-dot dot-warn" id="s-lfb"></div>
       <span class="source-name">Fire Brigade</span>
       <span class="source-desc" id="sd-lfb">Connecting...</span>
+    </div>
+  </div>
+
+  <div class="week-summary" id="week-summary" style="display:none;">
+    <div class="card" style="padding:16px 20px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+        <div style="font-size:13px;font-weight:600;color:var(--text-primary);text-transform:uppercase;letter-spacing:0.05em;">Intelligence Summary</div>
+        <div style="display:flex;gap:12px;align-items:center;">
+          <span id="ws-subscribers" style="font-size:10px;color:var(--text-muted);"></span>
+          <span id="ws-updated" style="font-size:10px;color:var(--text-muted);"></span>
+        </div>
+      </div>
+      <div id="ws-briefing" style="font-size:12px;color:var(--text-secondary);line-height:1.6;white-space:pre-wrap;max-height:200px;overflow-y:auto;"></div>
+      <div style="display:flex;gap:8px;margin-top:12px;">
+        <button onclick="generateDailyBriefing()" id="ws-gen-btn" style="font-size:10px;padding:4px 12px;background:rgba(139,92,246,0.15);color:#c084fc;border:1px solid rgba(139,92,246,0.3);border-radius:20px;cursor:pointer;">Generate New Briefing</button>
+        <button onclick="generateWeeklyReport()" id="ws-week-btn" style="font-size:10px;padding:4px 12px;background:rgba(59,130,246,0.15);color:#60a5fa;border:1px solid rgba(59,130,246,0.3);border-radius:20px;cursor:pointer;">Weekly Report</button>
+      </div>
     </div>
   </div>
 
@@ -1102,12 +1124,69 @@
     }).join('');
   }
 
+  async function loadWeekSummary() {
+    try {
+      // Load latest briefing
+      const r = await fetch(`${BASE}/api/briefings/latest`, FETCH_OPTS);
+      const json = await r.json();
+      if (json.data) {
+        const b = json.data;
+        document.getElementById('ws-briefing').textContent = (b.content || '').slice(0, 800);
+        const ago = timeAgo(new Date(b.generated_at));
+        document.getElementById('ws-updated').textContent = `Generated ${ago} from ${b.event_count} events`;
+        document.getElementById('week-summary').style.display = '';
+      }
+      // Load subscriber count
+      const sr = await fetch(`${BASE}/api/subscribers`, FETCH_OPTS);
+      const sj = await sr.json();
+      if (sj.count !== undefined) {
+        document.getElementById('ws-subscribers').textContent = `${sj.count} subscriber${sj.count !== 1 ? 's' : ''}`;
+        document.getElementById('m-subs').textContent = sj.count || 0;
+      }
+    } catch {}
+  }
+
+  async function generateDailyBriefing() {
+    const btn = document.getElementById('ws-gen-btn');
+    btn.disabled = true; btn.textContent = 'Generating...';
+    try {
+      const r = await fetch(`${BASE}/api/briefings/generate`, postOpts());
+      const json = await r.json();
+      if (json.success && json.briefing) {
+        document.getElementById('ws-briefing').textContent = json.briefing.slice(0, 800);
+        document.getElementById('ws-updated').textContent = `Just generated from ${json.eventCount} events`;
+        showToast(`Briefing generated from ${json.eventCount} events`, 'success');
+      } else {
+        showToast(json.message || 'No events to brief', 'info');
+      }
+      btn.textContent = 'Generate New Briefing'; btn.disabled = false;
+    } catch { btn.textContent = 'Error'; btn.disabled = false; }
+  }
+
+  async function generateWeeklyReport() {
+    const btn = document.getElementById('ws-week-btn');
+    btn.disabled = true; btn.textContent = 'Generating...';
+    try {
+      const r = await fetch(`${BASE}/api/briefings/weekly`, postOpts());
+      const json = await r.json();
+      if (json.success && json.briefing) {
+        document.getElementById('ws-briefing').textContent = json.briefing.slice(0, 800);
+        document.getElementById('ws-updated').textContent = `Weekly report — ${json.eventCount} events`;
+        showToast(`Weekly report generated from ${json.eventCount} events`, 'success');
+      } else {
+        showToast(json.message || 'No events', 'info');
+      }
+      btn.textContent = 'Weekly Report'; btn.disabled = false;
+    } catch { btn.textContent = 'Error'; btn.disabled = false; }
+  }
+
   async function loadAll() {
     document.getElementById('m-time').textContent = new Date().toLocaleTimeString('en-GB', { hour:'2-digit', minute:'2-digit' });
     loadFeed();
     loadEventsOnMap();
     loadPipelineStats();
     loadAnalytics();
+    loadWeekSummary();
   }
 
   window.addEventListener('load', () => {
