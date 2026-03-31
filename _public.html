@@ -424,6 +424,16 @@
     <div class="stat-item"><span class="stat-value" id="stat-area">&mdash;</span><span class="stat-label">Hotspot area</span></div>
   </div>
 
+  <div class="card" id="my-area-card" style="display:none;margin-bottom:16px;">
+    <div style="padding:14px 20px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+        <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;font-weight:500;">Your Area</div>
+        <button onclick="localStorage.removeItem('myArea');document.getElementById('my-area-card').style.display='none';" style="font-size:9px;color:var(--text-muted);background:none;border:none;cursor:pointer;">Change</button>
+      </div>
+      <div id="my-area-content"></div>
+    </div>
+  </div>
+
   <div class="card" style="margin-bottom:16px;">
     <div style="padding:16px 20px;">
       <div style="display:flex;gap:8px;align-items:center;">
@@ -631,6 +641,7 @@
           </div>
         </div>
       `;
+      localStorage.setItem('myArea', area);
     } catch {
       el.innerHTML = '<div style="font-size:12px;color:var(--danger);">Error loading safety score. Try again.</div>';
     }
@@ -1084,11 +1095,41 @@
     msg.style.display = 'block';
   });
 
+  function loadMyArea() {
+    const myArea = localStorage.getItem('myArea');
+    if (!myArea) return;
+    const el = document.getElementById('my-area-card');
+    if (!el) return;
+    el.style.display = '';
+    fetch(BASE + '/api/safety-score/' + encodeURIComponent(myArea))
+      .then(r => r.json())
+      .then(json => {
+        const d = json.data;
+        if (!d) { el.style.display = 'none'; return; }
+        const gradeColor = { A: '#4ade80', B: '#4ade80', C: '#facc15', D: '#f97316', F: '#ef4444' }[d.grade] || '#60a5fa';
+        el.querySelector('#my-area-content').innerHTML = `
+          <div style="display:flex;align-items:center;gap:16px;">
+            <div style="text-align:center;min-width:60px;">
+              <div style="font-size:32px;font-weight:800;color:${gradeColor};line-height:1;">${d.grade}</div>
+              <div style="font-size:9px;color:var(--text-muted);">Safety</div>
+            </div>
+            <div style="flex:1;">
+              <div style="font-size:14px;font-weight:600;color:var(--text-primary);">${esc(myArea)}</div>
+              <div style="font-size:11px;color:var(--text-secondary);">${d.eventCount} incident${d.eventCount !== 1 ? 's' : ''} in 30 days · ${d.comparedToAvg === 'above' ? '↑ above' : d.comparedToAvg === 'below' ? '↓ below' : '= near'} average</div>
+            </div>
+            <a href="/area/${encodeURIComponent(d.area)}" style="font-size:11px;color:var(--accent-blue);text-decoration:none;white-space:nowrap;">View report →</a>
+          </div>
+        `;
+      })
+      .catch(() => { el.style.display = 'none'; });
+  }
+
   window.addEventListener('load', () => {
     initMap();
     loadData();
     loadPublicEvents();
     loadStats();
+    loadMyArea();
     setInterval(loadData, 300000);
     setInterval(() => { loadPublicEvents(); loadStats(); }, 300000);
   });
