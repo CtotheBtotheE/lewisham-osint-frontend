@@ -757,9 +757,23 @@
     </div>
   </div>
 
-  <div class="card" style="margin-top:12px;padding:14px;">
-    <div class="chart-header">Trending Keywords</div>
-    <div id="trending-keywords" style="line-height:2;"></div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px;">
+    <div class="card" style="padding:14px;">
+      <div class="chart-header">Trending Keywords</div>
+      <div id="trending-keywords" style="line-height:2;"></div>
+    </div>
+    <div class="card" style="padding:14px;">
+      <div class="chart-header">AI Accuracy</div>
+      <div id="ai-accuracy" style="text-align:center;padding:12px 0;">
+        <div style="font-size:36px;font-weight:700;color:var(--text-primary);" id="ai-accuracy-pct">—</div>
+        <div style="font-size:10px;color:var(--text-muted);margin-bottom:8px;">accuracy rate</div>
+        <div style="display:flex;gap:16px;justify-content:center;font-size:11px;">
+          <div><span style="color:var(--success);" id="ai-correct">0</span> correct</div>
+          <div><span style="color:var(--danger);" id="ai-wrong">0</span> wrong</div>
+          <div><span style="color:var(--text-secondary);" id="ai-total">0</span> reviewed</div>
+        </div>
+      </div>
+    </div>
   </div>
 
 </div>
@@ -1044,6 +1058,20 @@
           .sort((a, b) => b.score - a.score)
           .slice(0, 12);
         renderTrending(keywords);
+      }
+    } catch {}
+
+    // Fetch AI accuracy
+    try {
+      const ar = await fetch(`${BASE}/api/ai/accuracy`, FETCH_OPTS);
+      const aj = await ar.json();
+      if (aj.success && aj.data) {
+        const d = aj.data;
+        document.getElementById('ai-accuracy-pct').textContent = d.accuracy + '%';
+        document.getElementById('ai-accuracy-pct').style.color = d.accuracy >= 80 ? 'var(--success)' : d.accuracy >= 50 ? '#facc15' : 'var(--danger)';
+        document.getElementById('ai-correct').textContent = d.correctPredictions;
+        document.getElementById('ai-wrong').textContent = d.totalReviewed - d.correctPredictions;
+        document.getElementById('ai-total').textContent = d.totalReviewed;
       }
     } catch {}
   }
