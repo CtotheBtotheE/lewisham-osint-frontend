@@ -37,6 +37,18 @@ export default {
       url.pathname = '/_public.html';
       return env.ASSETS.fetch(new Request(url.toString(), request));
     }
+    if (path === '/events' || path === '/events/') {
+      url.pathname = '/events.html';
+      return env.ASSETS.fetch(new Request(url.toString(), request));
+    }
+    if (path === '/briefings' || path === '/briefings/') {
+      url.pathname = '/briefings.html';
+      return env.ASSETS.fetch(new Request(url.toString(), request));
+    }
+    if (path.startsWith('/event/')) {
+      url.pathname = '/event.html';
+      return env.ASSETS.fetch(new Request(url.toString(), request));
+    }
 
     return env.ASSETS.fetch(request);
   },
