@@ -376,6 +376,7 @@
 </script>
 </head>
 <body>
+<div id="streak-msg" style="display:none;font-size:9px;color:var(--success);text-align:center;padding:4px 0;background:rgba(74,222,128,0.05);border-bottom:1px solid rgba(74,222,128,0.1);"></div>
 
 <header>
   <div class="header-left">
@@ -1127,12 +1128,40 @@
       .catch(() => { el.style.display = 'none'; });
   }
 
+  function trackVisit() {
+    const today = new Date().toISOString().slice(0, 10);
+    const lastVisit = localStorage.getItem('lastVisit');
+    let streak = parseInt(localStorage.getItem('visitStreak') || 0);
+
+    if (lastVisit === today) return; // Already counted today
+
+    const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+    if (lastVisit === yesterday) {
+      streak++;
+    } else {
+      streak = 1; // Reset streak
+    }
+
+    localStorage.setItem('lastVisit', today);
+    localStorage.setItem('visitStreak', streak);
+
+    // Show subtle streak message after 3+ days
+    if (streak >= 3) {
+      const msg = document.getElementById('streak-msg');
+      if (msg) {
+        msg.textContent = streak + ' day streak — keeping Lewisham informed';
+        msg.style.display = '';
+      }
+    }
+  }
+
   window.addEventListener('load', () => {
     initMap();
     loadData();
     loadPublicEvents();
     loadStats();
     loadMyArea();
+    trackVisit();
     setInterval(loadData, 300000);
     setInterval(() => { loadPublicEvents(); loadStats(); }, 300000);
   });
