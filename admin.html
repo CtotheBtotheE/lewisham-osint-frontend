@@ -537,10 +537,40 @@
 
     .toast-icon { flex-shrink: 0; font-size: 15px; line-height: 1; }
 
+    /* ---------- Analytics ---------- */
+    .analytics-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr 1fr;
+      gap: 12px;
+      margin-top: 16px;
+    }
+    .chart-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 14px;
+      box-shadow: var(--shadow-sm);
+    }
+    .chart-header {
+      font-size: 11px;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 12px;
+      font-weight: 500;
+    }
+    .bar-list { display: flex; flex-direction: column; gap: 6px; }
+    .bar-item { display: flex; align-items: center; gap: 8px; font-size: 11px; }
+    .bar-label { color: var(--text-secondary); width: 80px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex-shrink: 0; }
+    .bar-track { flex: 1; height: 6px; background: rgba(255,255,255,0.05); border-radius: 3px; overflow: hidden; }
+    .bar-fill { height: 100%; border-radius: 3px; transition: width 0.5s ease; }
+    .bar-count { color: var(--text-muted); font-size: 10px; width: 30px; text-align: right; flex-shrink: 0; }
+
     /* ---------- Responsive breakpoints ---------- */
     @media (max-width: 900px) {
       .main-grid { grid-template-columns: 1fr; }
       .metrics { grid-template-columns: repeat(3, 1fr); }
+      .analytics-row { grid-template-columns: 1fr 1fr; }
     }
 
     @media (max-width: 768px) {
@@ -555,6 +585,7 @@
 
     @media (max-width: 480px) {
       .metrics { grid-template-columns: 1fr; }
+      .analytics-row { grid-template-columns: 1fr; }
       .header-nav { flex-wrap: wrap; gap: var(--space-xs); }
       header {
         height: auto;
@@ -681,6 +712,25 @@
       <div class="status-dot dot-warn" id="s-lfb"></div>
       <span class="source-name">Fire Brigade</span>
       <span class="source-desc" id="sd-lfb">Connecting...</span>
+    </div>
+  </div>
+
+  <div class="analytics-row" id="analytics-row">
+    <div class="chart-card">
+      <div class="chart-header">Events (14 days)</div>
+      <canvas id="chart-daily" height="160"></canvas>
+    </div>
+    <div class="chart-card">
+      <div class="chart-header">By Category</div>
+      <canvas id="chart-categories" height="160"></canvas>
+    </div>
+    <div class="chart-card">
+      <div class="chart-header">Top Areas</div>
+      <div id="chart-areas" class="bar-list"></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-header">Source Mix</div>
+      <div id="chart-sources" class="bar-list"></div>
     </div>
   </div>
 
@@ -943,11 +993,121 @@
     } catch {}
   }
 
+  /* ---------- Analytics ---------- */
+  async function loadAnalytics() {
+    try {
+      const r = await fetch(`${BASE}/api/analytics/trends`, FETCH_OPTS);
+      const json = await r.json();
+      const d = json.data || {};
+
+      drawDailyChart(d.daily || []);
+      drawCategoryChart(d.categories || []);
+      renderBarList('chart-areas', d.areas || [], '#3b82f6');
+      renderBarList('chart-sources', d.sources || [], '#c084fc');
+    } catch {}
+  }
+
+  function drawDailyChart(data) {
+    const canvas = document.getElementById('chart-daily');
+    if (!canvas || !data.length) return;
+    const ctx = canvas.getContext('2d');
+    const w = canvas.width = canvas.offsetWidth * 2;
+    const h = canvas.height = 320;
+    ctx.scale(2, 2);
+    const cw = canvas.offsetWidth, ch = 160;
+    const max = Math.max(...data.map(d => parseInt(d.count)), 1);
+    const barW = Math.max(4, (cw - 20) / data.length - 2);
+
+    ctx.clearRect(0, 0, cw, ch);
+
+    // Grid lines
+    ctx.strokeStyle = 'rgba(255,255,255,0.05)';
+    ctx.lineWidth = 0.5;
+    for (let i = 0; i < 4; i++) {
+      const y = 10 + (ch - 30) * (i / 3);
+      ctx.beginPath(); ctx.moveTo(10, y); ctx.lineTo(cw - 10, y); ctx.stroke();
+    }
+
+    data.forEach((d, i) => {
+      const barH = (parseInt(d.count) / max) * (ch - 30);
+      const x = 10 + i * ((cw - 20) / data.length);
+      const y = ch - 20 - barH;
+
+      const grad = ctx.createLinearGradient(x, y, x, ch - 20);
+      grad.addColorStop(0, '#3b82f6');
+      grad.addColorStop(1, 'rgba(59,130,246,0.2)');
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.roundRect(x, y, barW, barH, 2);
+      ctx.fill();
+    });
+
+    // X-axis labels
+    ctx.fillStyle = '#475569';
+    ctx.font = '9px -apple-system, sans-serif';
+    ctx.textAlign = 'left';
+    if (data.length > 0) ctx.fillText(data[0].day.slice(5), 10, ch - 4);
+    ctx.textAlign = 'right';
+    if (data.length > 1) ctx.fillText(data[data.length-1].day.slice(5), cw - 10, ch - 4);
+  }
+
+  function drawCategoryChart(data) {
+    const canvas = document.getElementById('chart-categories');
+    if (!canvas || !data.length) return;
+    const ctx = canvas.getContext('2d');
+    const w = canvas.width = canvas.offsetWidth * 2;
+    const h = canvas.height = 320;
+    ctx.scale(2, 2);
+    const cw = canvas.offsetWidth, ch = 160;
+
+    const colors = ['#ef4444','#f97316','#facc15','#4ade80','#3b82f6','#c084fc','#f472b6','#60a5fa','#34d399','#a78bfa'];
+    const total = data.reduce((s, d) => s + parseInt(d.count), 0);
+    const max = Math.max(...data.map(d => parseInt(d.count)), 1);
+
+    const barH = Math.min(16, (ch - 10) / data.length - 4);
+    data.slice(0, 8).forEach((d, i) => {
+      const y = 4 + i * (barH + 4);
+      const barW = (parseInt(d.count) / max) * (cw - 90);
+
+      ctx.fillStyle = colors[i % colors.length];
+      ctx.globalAlpha = 0.8;
+      ctx.beginPath();
+      ctx.roundRect(80, y, barW, barH, 3);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+
+      ctx.fillStyle = '#94a3b8';
+      ctx.font = '9px -apple-system, sans-serif';
+      ctx.textAlign = 'right';
+      ctx.fillText(d.category.slice(0, 12), 75, y + barH - 3);
+
+      ctx.fillStyle = '#475569';
+      ctx.textAlign = 'left';
+      ctx.fillText(d.count, 80 + barW + 4, y + barH - 3);
+    });
+  }
+
+  function renderBarList(containerId, data, color) {
+    const el = document.getElementById(containerId);
+    if (!el || !data.length) { if (el) el.innerHTML = '<div style="font-size:11px;color:#475569;">No data</div>'; return; }
+    const max = Math.max(...data.map(d => parseInt(d.count)), 1);
+    el.innerHTML = data.slice(0, 8).map(d => {
+      const label = d.area_name || d.source_type || '';
+      const pct = (parseInt(d.count) / max) * 100;
+      return `<div class="bar-item">
+        <span class="bar-label">${label}</span>
+        <div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:${color};"></div></div>
+        <span class="bar-count">${d.count}</span>
+      </div>`;
+    }).join('');
+  }
+
   async function loadAll() {
     document.getElementById('m-time').textContent = new Date().toLocaleTimeString('en-GB', { hour:'2-digit', minute:'2-digit' });
     loadFeed();
     loadEventsOnMap();
     loadPipelineStats();
+    loadAnalytics();
   }
 
   window.addEventListener('load', () => {

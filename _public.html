@@ -285,7 +285,84 @@
     .layer-btn.heat.off {
       background: transparent; color: #fb923c; opacity: 0.5;
     }
+
+    /* ---------- Time filter buttons ---------- */
+    .time-slider-wrap {
+      display: flex; flex-direction: column; gap: 4px;
+      padding: 8px 16px; border-bottom: 1px solid var(--border);
+    }
+    .time-buttons { display: flex; gap: 4px; }
+    .time-btn {
+      font-size: 9px; padding: 3px 10px; border-radius: 20px; cursor: pointer;
+      font-weight: 600; border: 1px solid var(--border); background: transparent;
+      color: var(--text-muted); transition: all 0.2s ease;
+    }
+    .time-btn:hover { color: var(--text-secondary); border-color: #3d4268; }
+    .time-btn.active {
+      background: var(--accent-blue); color: #fff; border-color: var(--accent-blue);
+    }
+    .time-btn:focus-visible {
+      outline: 2px solid var(--border-focus); outline-offset: 2px;
+    }
+
+    /* ---------- Pulse marker for recent events ---------- */
+    .pulse-marker {
+      animation: markerPulse 2s ease-in-out infinite;
+    }
+    @keyframes markerPulse {
+      0%, 100% { opacity: 1; filter: drop-shadow(0 0 4px currentColor); }
+      50% { opacity: 0.6; filter: drop-shadow(0 0 10px currentColor); }
+    }
+
+    /* ---------- Area count labels ---------- */
+    .area-count-label {
+      background: rgba(59,130,246,0.9);
+      color: #fff;
+      border-radius: 50%;
+      width: 24px !important;
+      height: 24px !important;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 10px;
+      font-weight: 700;
+      border: 2px solid rgba(255,255,255,0.3);
+      box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+    }
+    .skeleton {
+      background: linear-gradient(90deg, var(--bg-card) 25%, var(--bg-card-hover) 50%, var(--bg-card) 75%);
+      background-size: 200% 100%;
+      animation: shimmer 1.5s infinite;
+      border-radius: var(--radius-sm);
+    }
+    @keyframes shimmer {
+      0% { background-position: 200% 0; }
+      100% { background-position: -200% 0; }
+    }
+    .skeleton-line { height: 12px; margin-bottom: 8px; }
+    .skeleton-line.short { width: 60%; }
   </style>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "WebApplication",
+  "name": "Lewisham Live",
+  "description": "Real-time crime intelligence platform for the London Borough of Lewisham",
+  "url": "https://lewishamlive.co.uk",
+  "applicationCategory": "NewsApplication",
+  "operatingSystem": "Web",
+  "offers": { "@type": "Offer", "price": "0", "priceCurrency": "GBP" },
+  "author": {
+    "@type": "Organization",
+    "name": "Lewisham Live"
+  },
+  "areaServed": {
+    "@type": "AdministrativeArea",
+    "name": "London Borough of Lewisham",
+    "containedIn": { "@type": "City", "name": "London" }
+  }
+}
+</script>
 </head>
 <body>
 
@@ -341,6 +418,16 @@
         <span style="font-size:11px;color:#475569;" id="map-count"></span>
       </div>
     </div>
+    <div class="time-slider-wrap" id="time-slider-wrap">
+      <label style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;">Time range</label>
+      <div class="time-buttons">
+        <button class="time-btn active" onclick="setTimeFilter(1, this)">1h</button>
+        <button class="time-btn" onclick="setTimeFilter(6, this)">6h</button>
+        <button class="time-btn" onclick="setTimeFilter(24, this)">24h</button>
+        <button class="time-btn" onclick="setTimeFilter(168, this)">7d</button>
+        <button class="time-btn" onclick="setTimeFilter(0, this)">All</button>
+      </div>
+    </div>
     <div style="position:relative;">
       <div id="map"></div>
       <div class="map-legend">
@@ -386,6 +473,9 @@
   let showCrime = true;
   let heatLayer = null;
   let heatmapVisible = false;
+  let eventsLayer = null;
+  let allEventsData = [];
+  let currentTimeFilterHours = 1;
 
   function esc(str) {
     const d = document.createElement('div');
@@ -469,6 +559,65 @@
     }
   }
 
+  function setTimeFilter(hours, btn) {
+    currentTimeFilterHours = hours;
+    document.querySelectorAll('.time-btn').forEach(b => b.classList.remove('active'));
+    if (btn) btn.classList.add('active');
+    loadEventsOnMap(allEventsData);
+  }
+
+  function loadEventsOnMap(events) {
+    if (!eventsLayer) return;
+    eventsLayer.clearLayers();
+
+    const now = Date.now();
+    const oneHourMs = 3600000;
+
+    // Filter events by time
+    const filtered = events.filter(ev => {
+      if (!ev.lat || !ev.lng) return false;
+      if (currentTimeFilterHours === 0) return true;
+      if (!ev.last_updated) return false;
+      const evTime = new Date(ev.last_updated).getTime();
+      return (now - evTime) <= currentTimeFilterHours * oneHourMs;
+    });
+
+    const sevColor = { critical: '#ef4444', major: '#f97316', minor: '#facc15', info: '#60a5fa' };
+
+    filtered.forEach(ev => {
+      const color = sevColor[ev.severity] || '#60a5fa';
+      const evTime = ev.last_updated ? new Date(ev.last_updated).getTime() : 0;
+      const isRecent = evTime && (now - evTime) < oneHourMs;
+      const marker = L.circleMarker([ev.lat, ev.lng], {
+        radius: 6, fillColor: color, color: color,
+        weight: 0.5, fillOpacity: 0.8,
+        className: isRecent ? 'pulse-marker' : ''
+      })
+      .bindTooltip(esc(ev.title || ev.category || 'Event'), { direction: 'top', className: 'crime-tooltip' });
+      marker.addTo(eventsLayer);
+    });
+
+    // Area count labels
+    const areaCounts = {};
+    filtered.forEach(ev => {
+      if (ev.area_name && ev.lat && ev.lng) {
+        if (!areaCounts[ev.area_name]) areaCounts[ev.area_name] = { count: 0, lat: ev.lat, lng: ev.lng };
+        areaCounts[ev.area_name].count++;
+      }
+    });
+    Object.entries(areaCounts).forEach(([name, data]) => {
+      if (data.count >= 2) {
+        L.marker([data.lat, data.lng], {
+          icon: L.divIcon({
+            className: 'area-count-label',
+            html: '<span>' + data.count + '</span>',
+            iconSize: [24, 24],
+          })
+        }).bindTooltip(name, { permanent: false, direction: 'top' }).addTo(eventsLayer);
+      }
+    });
+  }
+
   function initMap() {
     map = L.map('map', { zoomControl: true, attributionControl: false })
             .setView([LEWISHAM.lat, LEWISHAM.lng], 13);
@@ -478,6 +627,16 @@
     }).addTo(map);
 
     crimeLayer = L.layerGroup().addTo(map);
+    eventsLayer = L.layerGroup().addTo(map);
+
+    // Lewisham boundary (approximate circle fallback overlay)
+    L.circle([51.4513, -0.0117], {
+      radius: 3500,
+      color: 'rgba(59,130,246,0.3)',
+      fillColor: 'rgba(59,130,246,0.05)',
+      weight: 1,
+      dashArray: '5,5',
+    }).addTo(map);
 
     fetch('https://mapit.mysociety.org/area/2492.geojson?simplify_tolerance=0.001')
       .then(r => r.json())
@@ -676,17 +835,19 @@
 
       document.getElementById('map-count').textContent = crimes.length + ' incidents plotted (' + usedMonth + ')';
 
-      // Build heatmap data from events
+      // Build heatmap data from events and render event markers
       try {
         const eventsR = await fetch(BASE + '/api/events');
         const eventsJson = await eventsR.json();
         const eventsData = eventsJson.data || [];
+        allEventsData = eventsData;
         const heatPoints = eventsData
           .filter(e => e.lat && e.lng)
           .map(e => [e.lat, e.lng, e.severity === 'critical' ? 1.0 : e.severity === 'major' ? 0.7 : 0.4]);
         if (heatLayer) map.removeLayer(heatLayer);
         heatLayer = L.heatLayer(heatPoints, { radius: 25, blur: 15, maxZoom: 17, gradient: { 0.2: '#3b82f6', 0.4: '#facc15', 0.6: '#f97316', 1: '#ef4444' } });
         if (heatmapVisible) heatLayer.addTo(map);
+        loadEventsOnMap(allEventsData);
       } catch {}
 
     } catch {

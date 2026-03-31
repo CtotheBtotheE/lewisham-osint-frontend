@@ -1,0 +1,8 @@
+User-agent: *
+Allow: /
+Allow: /events
+Allow: /briefings
+Allow: /event/
+Disallow: /admin
+Disallow: /admin/
+Sitemap: https://lewishamlive.co.uk/sitemap.xml
